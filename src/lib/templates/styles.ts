@@ -386,33 +386,6 @@ export function getSharedCss(): string {
       font-weight: 700;
     }
 
-    /* ============ Corner info (repeats on every printed page) ============ */
-    .corner-info {
-      position: fixed;
-      font-size: 7pt;
-      color: #aaa;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-    }
-    .corner-top-left {
-      top: 0;
-      left: 0;
-    }
-    .corner-top-right {
-      top: 0;
-      right: 0;
-    }
-    .corner-bottom-left {
-      bottom: 0;
-      left: 0;
-    }
-    .corner-bottom-right {
-      bottom: 0;
-      right: 0;
-    }
-    .page-number::after {
-      content: counter(page) "/" counter(pages);
-    }
-
     /* ============ Print ============ */
     @media print {
       body {

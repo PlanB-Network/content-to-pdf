@@ -80,7 +80,7 @@
         <h1>${title.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</h1>
         <p>Preparing your PDF — the save dialog should appear shortly.</p>
         <div class="spinner"></div>
-        <div class="hint">Use "Save as PDF" in the print dialog to download your file.</div>
+        <div class="hint">Choose "Save as PDF" in the print dialog to download your file.</div>
       </div>
     `;
 

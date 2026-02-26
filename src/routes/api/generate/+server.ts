@@ -5,8 +5,7 @@ import {
   fetchCourseMarkdown,
   fetchCourseYml,
   fetchQuizQuestions,
-  fetchLocaleFile,
-  fetchCourseLastCommit
+  fetchLocaleFile
 } from '$lib/server/github.js';
 import { parseCourseMarkdown } from '$lib/markdown.js';
 import { generateCoverHtml } from '$lib/templates/cover.js';
@@ -21,17 +20,7 @@ import {
   generateAnswerKeyHtml
 } from '$lib/templates/quiz.js';
 import { getSharedCss } from '$lib/templates/styles.js';
-import { escapeHtml, formatCourseCode } from '$lib/utils.js';
-
-function generateCornerInfoHtml(courseCode: string, version: string): string {
-  const formattedCode = formatCourseCode(courseCode);
-  return `
-    <div class="corner-info corner-top-left">${escapeHtml(formattedCode)}</div>
-    <div class="corner-info corner-top-right">planb.academy</div>
-    <div class="corner-info corner-bottom-left"><span class="page-number"></span></div>
-    <div class="corner-info corner-bottom-right">${escapeHtml(version)}</div>
-  `;
-}
+import { escapeHtml } from '$lib/utils.js';
 
 async function loadLocales(lang: string): Promise<{
   locale: Translations | null;
@@ -53,15 +42,13 @@ async function generateCourseHtml(
   platform: App.Platform | undefined
 ): Promise<{ html: string; title: string }> {
   // Fetch all data in parallel
-  const [rawMd, courseYml, locales, lastCommit] = await Promise.all([
+  const [rawMd, courseYml, locales] = await Promise.all([
     fetchCourseMarkdown(code, lang),
     fetchCourseYml(code),
-    loadLocales(lang),
-    fetchCourseLastCommit(code, lang, platform)
+    loadLocales(lang)
   ]);
 
   const parsed = parseCourseMarkdown(rawMd);
-  const version = lastCommit ? `v${lastCommit}` : '';
 
   const coverHtml = generateCoverHtml({
     courseCode: code,
@@ -95,8 +82,6 @@ async function generateCourseHtml(
 
   const title = parsed.frontmatter.name || code.toUpperCase();
 
-  const cornerInfoHtml = generateCornerInfoHtml(code, version);
-
   const html = `<!DOCTYPE html>
 <html lang="${lang}">
 <head>
@@ -105,7 +90,6 @@ async function generateCourseHtml(
   <style>${getSharedCss()}</style>
 </head>
 <body>
-  ${cornerInfoHtml}
   ${coverHtml}
   ${tocHtml}
   ${bodyHtml}
@@ -124,12 +108,11 @@ async function generateQuizHtml(
   platform: App.Platform | undefined
 ): Promise<{ html: string; title: string }> {
   // Fetch all data in parallel
-  const [questionsRaw, courseYml, rawMd, locales, lastCommit] = await Promise.all([
+  const [questionsRaw, courseYml, rawMd, locales] = await Promise.all([
     fetchQuizQuestions(code, lang, platform),
     fetchCourseYml(code),
     fetchCourseMarkdown(code, lang).catch(() => null),
-    loadLocales(lang),
-    fetchCourseLastCommit(code, lang, platform)
+    loadLocales(lang)
   ]);
 
   let questions = questionsRaw;
@@ -183,8 +166,6 @@ async function generateQuizHtml(
   }
 
   const title = `${courseName} - Quiz`;
-  const version = lastCommit ? `v${lastCommit}` : '';
-  const cornerInfoHtml = generateCornerInfoHtml(code, version);
 
   const html = `<!DOCTYPE html>
 <html lang="${lang}">
@@ -194,7 +175,6 @@ async function generateQuizHtml(
   <style>${getSharedCss()}</style>
 </head>
 <body>
-  ${cornerInfoHtml}
   ${coverHtml}
   ${quizHtml}
   ${answerKeyHtml}
