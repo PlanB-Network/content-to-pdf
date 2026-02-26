@@ -3,3 +3,6 @@ output/
 .env
 dist/
 *.tsbuildinfo
+.svelte-kit/
+build/
+bun.lock

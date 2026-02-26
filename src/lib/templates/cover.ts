@@ -1,5 +1,6 @@
-import { formatCourseCode, getLanguageName, getTodayDate } from "../utils.js";
-import { t } from "../i18n.js";
+import { formatCourseCode, getLanguageName, getTodayDate, escapeHtml } from '../utils.js';
+import { t } from '../i18n.js';
+import type { Translations } from '../types.js';
 
 export interface CoverOptions {
   courseCode: string;
@@ -13,36 +14,43 @@ export interface CoverOptions {
   topic: string;
   isQuiz?: boolean;
   questionCount?: number;
-  blmsPath: string;
+  locale: Translations | null;
+  enLocale: Translations | null;
 }
 
 export function generateCoverHtml(options: CoverOptions): string {
   const {
-    courseCode, lang, name, goal, objectives,
-    isQuiz, questionCount, blmsPath,
+    courseCode,
+    lang,
+    name,
+    goal,
+    objectives,
+    isQuiz,
+    questionCount,
+    locale,
+    enLocale
   } = options;
 
   const today = getTodayDate();
   const langName = getLanguageName(lang);
   const formattedCode = formatCourseCode(courseCode);
-  const quizLabel = t(lang, "courses.quizz.quizz", blmsPath);
-  const learningLabel = t(lang, "courses.details.learning", blmsPath);
-  const objectivesTitle = t(lang, "courses.details.objectivesTitle", blmsPath);
-  const translatedGoal = t(lang, "words.goal", blmsPath);
+  const quizLabel = t(locale, enLocale, 'courses.quizz.quizz');
+  const learningLabel = t(locale, enLocale, 'courses.details.learning');
+  const objectivesTitle = t(locale, enLocale, 'courses.details.objectivesTitle');
+  const translatedGoal = t(locale, enLocale, 'words.goal');
 
   const quizSubtitle = isQuiz
-    ? `<p class="cover-subtitle">${escapeHtml(quizLabel)}${questionCount ? ` — ${questionCount} questions` : ""}</p>`
-    : "";
+    ? `<p class="cover-subtitle">${escapeHtml(quizLabel)}${questionCount ? ` — ${questionCount} questions` : ''}</p>`
+    : '';
 
-  // Learning path / objectives on cover
-  let objectivesHtml = "";
+  let objectivesHtml = '';
   if (!isQuiz && objectives && objectives.length > 0) {
     objectivesHtml = `
       <div class="cover-objectives">
         <div class="cover-objectives-label">${escapeHtml(learningLabel)}</div>
         <p class="cover-objectives-title">${escapeHtml(objectivesTitle)}</p>
         <ul class="objectives-list">
-          ${objectives.map((o) => `<li>${escapeHtml(o)}</li>`).join("\n          ")}
+          ${objectives.map((o) => `<li>${escapeHtml(o)}</li>`).join('\n          ')}
         </ul>
       </div>
     `;
@@ -63,12 +71,4 @@ export function generateCoverHtml(options: CoverOptions): string {
       ${objectivesHtml}
     </div>
   `;
-}
-
-function escapeHtml(str: string): string {
-  return String(str || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }

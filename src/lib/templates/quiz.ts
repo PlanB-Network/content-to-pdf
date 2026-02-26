@@ -1,24 +1,8 @@
-import { t } from "../i18n.js";
+import { t } from '../i18n.js';
+import { escapeHtml } from '../utils.js';
+import type { QuizQuestion, ShuffledQuestion, Translations } from '../types.js';
 
-export interface QuizQuestion {
-  index: number;
-  chapterId: string;
-  question: string;
-  correctAnswer: string;
-  wrongAnswers: string[];
-  explanation: string;
-  difficulty: string;
-}
-
-export interface ShuffledQuestion {
-  index: number;
-  question: string;
-  choices: { letter: string; text: string }[];
-  correctLetter: string;
-  explanation: string;
-}
-
-const LETTERS = ["A", "B", "C", "D"];
+const LETTERS = ['A', 'B', 'C', 'D'];
 
 export function shuffleQuestions(questions: QuizQuestion[]): ShuffledQuestion[] {
   return questions.map((q, i) => {
@@ -30,17 +14,17 @@ export function shuffleQuestions(questions: QuizQuestion[]): ShuffledQuestion[] 
     }
     const choices = allAnswers.map((text, idx) => ({
       letter: LETTERS[idx] || String(idx + 1),
-      text,
+      text
     }));
     const correctLetter =
-      choices.find((c) => c.text === q.correctAnswer)?.letter || "?";
+      choices.find((c) => c.text === q.correctAnswer)?.letter || '?';
 
     return {
       index: i + 1,
       question: q.question,
       choices,
       correctLetter,
-      explanation: q.explanation,
+      explanation: q.explanation
     };
   });
 }
@@ -48,10 +32,10 @@ export function shuffleQuestions(questions: QuizQuestion[]): ShuffledQuestion[] 
 export function generateQuizBodyHtml(
   questions: ShuffledQuestion[],
   courseCode: string,
-  lang: string,
-  blmsPath: string
+  locale: Translations | null,
+  enLocale: Translations | null
 ): string {
-  const quizLabel = t(lang, "courses.quizz.quizz", blmsPath);
+  const quizLabel = t(locale, enLocale, 'courses.quizz.quizz');
 
   let html = `<div class="quiz-header-box">${escapeHtml(quizLabel)} — ${courseCode.toUpperCase()} (${questions.length} questions)</div>\n`;
 
@@ -68,7 +52,7 @@ export function generateQuizBodyHtml(
             <span class="choice-text">${escapeHtml(c.text)}</span>
           </div>`
           )
-          .join("\n")}
+          .join('\n')}
       </div>
     `;
   }
@@ -78,10 +62,10 @@ export function generateQuizBodyHtml(
 
 export function generateAnswerKeyHtml(
   questions: ShuffledQuestion[],
-  lang: string,
-  blmsPath: string
+  locale: Translations | null,
+  enLocale: Translations | null
 ): string {
-  const answersLabel = t(lang, "courses.exam.answersReview", blmsPath);
+  const answersLabel = t(locale, enLocale, 'courses.exam.answersReview');
 
   let html = `
     <div class="answer-key">
@@ -93,21 +77,13 @@ export function generateAnswerKeyHtml(
       <div class="answer-item">
         <div class="answer-item-header">
           Q${q.index}: <span class="answer-correct">${q.correctLetter}</span>
-          — ${escapeHtml(q.choices.find((c) => c.letter === q.correctLetter)?.text || "")}
+          — ${escapeHtml(q.choices.find((c) => c.letter === q.correctLetter)?.text || '')}
         </div>
-        ${q.explanation ? `<div class="answer-explanation">${escapeHtml(q.explanation.trim())}</div>` : ""}
+        ${q.explanation ? `<div class="answer-explanation">${escapeHtml(q.explanation.trim())}</div>` : ''}
       </div>
     `;
   }
 
-  html += "</div>";
+  html += '</div>';
   return html;
-}
-
-function escapeHtml(str: string): string {
-  return String(str || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }

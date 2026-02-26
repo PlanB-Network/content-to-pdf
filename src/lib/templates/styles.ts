@@ -1,10 +1,10 @@
-export const ORANGE = "#FF5C00";
+export const ORANGE = '#FF5C00';
 
 export function getSharedCss(): string {
   return `
     @page {
       size: A4;
-      margin: 20mm 15mm;
+      margin: 25mm 20mm;
     }
     * { box-sizing: border-box; }
     body {
@@ -85,7 +85,6 @@ export function getSharedCss(): string {
       margin: 8px 0;
       font-size: 10pt;
     }
-
 
     /* ============ Table of Contents ============ */
     .toc-page { page-break-after: always; }
@@ -201,6 +200,11 @@ export function getSharedCss(): string {
       height: auto;
       display: block;
       margin: 16px auto;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    p:has(> img) {
+      break-inside: avoid;
       page-break-inside: avoid;
     }
     blockquote {
@@ -380,6 +384,41 @@ export function getSharedCss(): string {
       left: 0;
       color: ${ORANGE};
       font-weight: 700;
+    }
+
+    /* ============ Corner info (repeats on every printed page) ============ */
+    .corner-info {
+      position: fixed;
+      font-size: 7pt;
+      color: #aaa;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+    }
+    .corner-top-left {
+      top: 0;
+      left: 0;
+    }
+    .corner-top-right {
+      top: 0;
+      right: 0;
+    }
+    .corner-bottom-left {
+      bottom: 0;
+      left: 0;
+    }
+    .corner-bottom-right {
+      bottom: 0;
+      right: 0;
+    }
+    .page-number::after {
+      content: counter(page) "/" counter(pages);
+    }
+
+    /* ============ Print ============ */
+    @media print {
+      body {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
     }
   `;
 }
