@@ -7,7 +7,7 @@ export function getSharedCss(): string {
   return `
     @page {
       size: A4;
-      margin: 20mm 20mm 25mm 20mm;
+      margin: 15mm 20mm 25mm 20mm;
     }
     * { box-sizing: border-box; }
     body {
@@ -107,7 +107,7 @@ export function getSharedCss(): string {
     }
     .instructor-divider {
       border: none;
-      border-top: 1px dashed #ccc;
+      border-top: 1.5px dashed #999;
       margin: 12px 0;
     }
     .instructor-name-line {
@@ -490,7 +490,7 @@ export function getSharedCss(): string {
         align-items: center;
         justify-content: space-between;
         padding-top: 1.5mm;
-        border-top: 0.5pt solid #ddd;
+        border-top: 1pt solid #999;
       }
       .pdf-footer-page::after {
         content: counter(page);
@@ -517,7 +517,7 @@ export function getSharedCss(): string {
         align-items: center;
         justify-content: space-between;
         padding-top: 1.5mm;
-        border-top: 0.5pt solid #ddd;
+        border-top: 1pt solid #999;
         font-size: 7pt;
         color: #999;
       }

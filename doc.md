@@ -6,7 +6,7 @@
 
 | | |
 |---|---|
-| **Version** | 2.2.0 |
+| **Version** | 2.3.0 |
 | **Stack** | SvelteKit 2 · Svelte 5 (runes) · Tailwind CSS v4 · TypeScript |
 | **Runtime** | OpenWorkers (Cloudflare Workers-compatible edge) |
 | **Dev** | Bun / Vite 7 |
@@ -23,6 +23,7 @@
 │                                                  │
 │  +page.svelte                                    │
 │  ├─ GeneratorForm  (course/lang/mode selector)   │
+│  │   └─ fetches en.md from GitHub for names      │
 │  ├─ PdfPreview     (iframe + "Save as PDF")      │
 │  └─ Nav            (header bar)                  │
 └──────────────┬──────────────────────────────────┘
@@ -145,9 +146,11 @@ Returns all available courses.
 **Response:**
 ```json
 [
-  { "code": "btc101", "name": "The Bitcoin Journey", "level": "beginner", "topic": "bitcoin", "languages": [] }
+  { "code": "btc101", "name": "", "level": "beginner", "topic": "bitcoin", "languages": [] }
 ]
 ```
+
+> **Note:** Course names are resolved client-side (the browser fetches `en.md` frontmatter directly from GitHub). This avoids rate-limiting issues on the edge worker.
 
 ### `GET /api/languages?code={courseCode}`
 
@@ -273,6 +276,7 @@ Sticky header with Plan B logo, app title, and branding.
 - `filteredCourses` — courses matching selected filters
 
 **Effects ($effect):**
+- On mount: fetches `en.md` from `raw.githubusercontent.com` for each course missing a name (client-side name resolution, avoids worker rate-limiting)
 - When `selectedCode` changes → fetches `/api/languages?code=...` → auto-selects `'en'` or first available
 
 **Form sections:**
@@ -295,7 +299,7 @@ Sticky header with Plan B logo, app title, and branding.
 
 **Behavior:**
 - Injects a pagination script into the iframe that splits content into A4-sized pages
-- Pages are measured using DOM `scrollHeight` with margin collapse (794×1123 px per page, 76px padding on all sides)
+- Pages are measured using DOM `scrollHeight` with margin collapse (794×1123 px per page, 57px top / 76px sides+bottom padding)
 - Respects page break hints: `break-before` on chapter headers, final page, answer key; `break-after` on cover page, TOC page
 - Part headers are pulled forward to stay with their first chapter when a page break occurs
 - Waits for all images to load before paginating
@@ -305,7 +309,7 @@ Sticky header with Plan B logo, app title, and branding.
 - View mode toggle buttons in the toolbar (single page / grid icons)
 - Page count badge displayed next to the title
 - Communication between parent and iframe via `postMessage` (`pdfPreviewReady`, `setViewMode`, `pdfViewModeChanged`)
-- **"Save as PDF"**: extracts the already-paginated HTML from the preview iframe (including footer clones), strips scripts, injects print-specific CSS (`@page { margin: 0 }`, `.pdf-page { 210mm × 297mm; padding: 20mm }`), and opens the browser print dialog
+- **"Save as PDF"**: extracts the already-paginated HTML from the preview iframe (including footer clones), strips scripts, injects print-specific CSS (`@page { margin: 0 }`, `.pdf-page { 210mm × 297mm; padding: 15mm 20mm 20mm 20mm }`), and opens the browser print dialog
 - Overlay shows spinner, instructions, Plan B branding (screen-only, hidden in print)
 
 ### +page.svelte (Main Page)
@@ -325,7 +329,7 @@ Sticky header with Plan B logo, app title, and branding.
 **Key functions:**
 | Function | Purpose |
 |---|---|
-| `listCourses(platform)` | List all courses from BEC repo, fetch names/levels/topics in parallel |
+| `listCourses(platform)` | List all courses from BEC repo, fetch levels/topics in parallel (names resolved client-side) |
 | `listCourseLanguages(code, platform)` | List available `.md` files for a course → extract language codes |
 | `fetchCourseMarkdown(code, lang)` | Fetch raw markdown from `courses/{code}/{lang}.md` |
 | `fetchCourseYml(code)` | Fetch course metadata from `courses/{code}/course.yml` |
@@ -355,7 +359,7 @@ Covers 25+ keys: `words.course`, `courses.details.curriculum`, `courses.exam.ans
 
 | File | Generates |
 |---|---|
-| `styles.ts` | Print-optimized CSS (A4, 20mm margins, orange accents), page footer HTML (PlanB logo + optional corporate logo + page number) |
+| `styles.ts` | Print-optimized CSS (A4, 15mm top / 20mm side / 25mm bottom margins, orange accents), page footer HTML (PlanB logo + optional corporate logo + page number) |
 | `cover.ts` | Cover page (title, code, lang, date, goal, objectives, quiz count, optional instructor section) |
 | `course.ts` | TOC with anchors, course body (parts + chapters), final page with QR code |
 | `quiz.ts` | Shuffled questions (A/B/C/D), answer key with explanations |
@@ -463,3 +467,4 @@ The course list and per-course languages are cached in-memory for 10 minutes.
 **v2.0.0** — Web app (SvelteKit + OpenWorkers), GitHub API, browser print, lazy language loading
 **v2.1.0** — Paginated PDF preview with single/grid view modes, proper @page margins
 **v2.2.0** — Page footer (PlanB logo + page numbers), instructor/presenter section on cover, print pipeline uses pre-paginated HTML, tighter typography
+**v2.3.0** — Client-side course name resolution (avoids worker rate-limiting), reduced top margin (15mm), improved print visibility for dividers and footer lines

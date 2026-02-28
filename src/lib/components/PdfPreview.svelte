@@ -76,7 +76,7 @@
         .pdf-page {
           width: 210mm;
           height: 297mm;
-          padding: 20mm;
+          padding: 15mm 20mm 20mm 20mm;
           box-sizing: border-box;
         }
       }
@@ -142,7 +142,7 @@
         width: 794px;
         height: 1123px;
         background: white;
-        padding: 76px;
+        padding: 57px 76px 76px 76px;
         box-sizing: border-box;
         overflow: hidden;
       }
@@ -166,7 +166,7 @@
         align-items: center;
         justify-content: space-between;
         padding-top: 4px;
-        border-top: 0.5px solid #ddd;
+        border-top: 1px solid #999;
         font-size: 7px;
         color: #999;
       }
@@ -251,8 +251,9 @@
       var PAGE_W = 794;
       var PAGE_H = 1123;
       var PAD_X = 76;
-      var PAD_Y = 76;
-      var CONTENT_H = PAGE_H - PAD_Y * 2;
+      var PAD_TOP = 57;
+      var PAD_BOTTOM = 76;
+      var CONTENT_H = PAGE_H - PAD_TOP - PAD_BOTTOM;
       var CONTENT_W = PAGE_W - PAD_X * 2;
 
       var BREAK_BEFORE = ['chapter-header', 'final-page', 'answer-key'];

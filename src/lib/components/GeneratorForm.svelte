@@ -17,6 +17,32 @@
 
   let { courses, loading, ongenerate }: Props = $props();
 
+  // Client-side course name resolution (avoids worker rate-limiting)
+  const BEC_RAW = 'https://raw.githubusercontent.com/PlanB-Network/bitcoin-educational-content/dev';
+  let courseNames = $state<Record<string, string>>({});
+  const pendingNames = new Set<string>();
+
+  function extractName(text: string): string {
+    const m = text.match(/^---\s*\n([\s\S]*?)\n---/);
+    if (!m) return '';
+    const n = m[1].match(/^name:\s*(.+)$/m);
+    return n ? n[1].trim().replace(/^["']|["']$/g, '') : '';
+  }
+
+  $effect(() => {
+    for (const c of courses) {
+      if (c.name || courseNames[c.code] || pendingNames.has(c.code)) continue;
+      pendingNames.add(c.code);
+      fetch(`${BEC_RAW}/courses/${c.code}/en.md`)
+        .then((r) => (r.ok ? r.text() : ''))
+        .then((t) => {
+          const n = extractName(t);
+          if (n) courseNames[c.code] = n;
+        })
+        .catch(() => {});
+    }
+  });
+
   let filterLevel = $state('');
   let filterTopic = $state('');
   let selectedCode = $state('');
@@ -152,7 +178,8 @@
     >
       <option value="">Select a course...</option>
       {#each filteredCourses as course}
-        <option value={course.code}>{course.code}{course.name ? ` — ${course.name}` : ''}</option>
+        {@const displayName = course.name || courseNames[course.code] || ''}
+        <option value={course.code}>{course.code}{displayName ? ` — ${displayName}` : ''}</option>
       {/each}
     </select>
   </div>

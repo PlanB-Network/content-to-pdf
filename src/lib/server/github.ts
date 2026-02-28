@@ -30,44 +30,44 @@ function authHeaders(platform: App.Platform | undefined): Record<string, string>
 }
 
 /**
- * Fetch the course name (from en.md frontmatter) and metadata (from course.yml) in parallel.
+ * Fetch course metadata (level & topic) from course.yml.
+ * Names are resolved client-side to avoid worker rate-limiting.
  */
-async function fetchCourseInfo(
+async function fetchCourseMeta(
   code: string
-): Promise<{ name: string; level: string; topic: string }> {
-  const [name, meta] = await Promise.all([
-    // Fetch name from en.md frontmatter
-    (async () => {
-      try {
-        const url = `${RAW_BASE}/courses/${code}/en.md`;
-        const res = await fetch(url);
-        if (!res.ok) return '';
-        const text = await res.text();
-        const match = text.match(/^---\s*\n([\s\S]*?)\n---/);
-        if (!match) return '';
-        const nameMatch = match[1].match(/^name:\s*(.+)$/m);
-        return nameMatch ? nameMatch[1].trim() : '';
-      } catch {
-        return '';
-      }
-    })(),
-    // Fetch level & topic from course.yml
-    (async () => {
-      try {
-        const url = `${RAW_BASE}/courses/${code}/course.yml`;
-        const res = await fetch(url);
-        if (!res.ok) return { level: '', topic: '' };
-        const yml = parseYaml(await res.text()) as Record<string, unknown>;
-        return {
-          level: (yml.level as string) || '',
-          topic: (yml.topic as string) || ''
-        };
-      } catch {
-        return { level: '', topic: '' };
-      }
-    })()
-  ]);
-  return { name, ...meta };
+): Promise<{ level: string; topic: string }> {
+  try {
+    const url = `${RAW_BASE}/courses/${code}/course.yml`;
+    const res = await fetch(url);
+    if (!res.ok) return { level: '', topic: '' };
+    const yml = parseYaml(await res.text()) as Record<string, unknown>;
+    return {
+      level: (yml.level as string) || '',
+      topic: (yml.topic as string) || ''
+    };
+  } catch {
+    return { level: '', topic: '' };
+  }
+}
+
+/**
+ * Run async tasks with a concurrency limit to avoid GitHub rate limits.
+ */
+async function mapConcurrent<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let idx = 0;
+  async function worker() {
+    while (idx < items.length) {
+      const i = idx++;
+      results[i] = await fn(items[i]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, () => worker()));
+  return results;
 }
 
 /**
@@ -98,12 +98,12 @@ export async function listCourses(platform: App.Platform | undefined): Promise<C
   const entries: { name: string; type: string }[] = await res.json();
   const codes = entries.filter((e) => e.type === 'dir').map((e) => e.name);
 
-  // Fetch names and metadata in parallel for all courses
-  const infos = await Promise.all(codes.map((code) => fetchCourseInfo(code)));
+  // Fetch metadata with limited concurrency (names resolved client-side)
+  const infos = await mapConcurrent(codes, 10, (code) => fetchCourseMeta(code));
 
   const courses: CourseInfo[] = codes.map((code, i) => ({
     code,
-    name: infos[i].name,
+    name: '',
     level: infos[i].level,
     topic: infos[i].topic,
     languages: []
