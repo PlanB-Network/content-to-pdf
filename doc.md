@@ -6,7 +6,7 @@
 
 | | |
 |---|---|
-| **Version** | 2.3.0 |
+| **Version** | 2.4.0 |
 | **Stack** | SvelteKit 2 · Svelte 5 (runes) · Tailwind CSS v4 · TypeScript |
 | **Runtime** | OpenWorkers (Cloudflare Workers-compatible edge) |
 | **Dev** | Bun / Vite 7 |
@@ -47,6 +47,7 @@
 │                                                  │
 │  Raw content:  raw.githubusercontent.com         │
 │  Contents API: api.github.com/repos/.../contents │
+│  GraphQL API:  api.github.com/graphql            │
 │  Repos:                                          │
 │  - PlanB-Network/bitcoin-educational-content     │
 │  - PlanB-Network/bitcoin-learning-management-sys │
@@ -122,7 +123,7 @@ content-to-pdf/
    - **Cover page** — title, code, language, date, goal, objectives; optional instructor name/logo
    - **Table of contents** — numbered list with anchor links
    - **Body** — part headers + chapter headers + rendered markdown content
-   - **Final page** — QR code linking to the course review page
+   - **Final page** — credits (teacher, contributors, proofreaders, license, GitHub source), review QR code, Discord contribute section with QR code, CTA messages, PlanB logo
    - **Page footer** — PlanB Academy logo + optional corporate logo (centered together) + page numbers (on every page except cover)
 5. Wraps everything in a complete HTML document with print-optimized CSS
 6. Client displays in a paginated iframe preview; "Save as PDF" extracts the paginated HTML and opens browser print dialog
@@ -230,6 +231,14 @@ interface GenerateResponse {
   title: string;
 }
 
+// Course credits (final page)
+interface CourseCredits {
+  teachers: string[];
+  contributors: string[];
+  proofreaders: string[];
+  originalLanguage: string;
+}
+
 // Quiz structures
 interface QuizQuestion {
   index: number;
@@ -257,7 +266,7 @@ type Translations = Record<string, unknown>;
 ## Components (Svelte 5 Runes)
 
 ### Nav.svelte
-Sticky header with Plan B logo, app title, and branding.
+Sticky header with PlanB pill logo, app title ("Courses PDF Generator"), and "Enjoy teaching" tagline.
 
 ### GeneratorForm.svelte
 
@@ -335,6 +344,7 @@ Sticky header with Plan B logo, app title, and branding.
 | `fetchCourseYml(code)` | Fetch course metadata from `courses/{code}/course.yml` |
 | `fetchQuizQuestions(code, lang, platform)` | List `quizz/` subdirectories, fetch question + answers in parallel |
 | `fetchLocaleFile(lang)` | Fetch BLMS translation file (`/locales/{lang}.json`) |
+| `fetchProfessorNames(ids, platform)` | Resolve professor UUIDs to display names via GitHub GraphQL API (cached 10 min) |
 | `fetchCourseLastCommit(code, lang, platform)` | Get last commit date for a course file |
 | `getImageUrl(code, imgRef, lang)` | Build GitHub raw CDN URL for course images |
 
@@ -353,7 +363,7 @@ Sticky header with Plan B logo, app title, and branding.
 
 3-tier fallback: requested locale → English locale → hardcoded defaults.
 
-Covers 25+ keys: `words.course`, `courses.details.curriculum`, `courses.exam.answersReview`, etc.
+Covers 40+ keys: `words.course`, `courses.details.curriculum`, `courses.exam.answersReview`, `courses.final.*` (endOfCourse, credits, teacher, contributors, proofreaders, license, source, contribute, etc.).
 
 ### templates/ — HTML Generators
 
@@ -361,7 +371,7 @@ Covers 25+ keys: `words.course`, `courses.details.curriculum`, `courses.exam.ans
 |---|---|
 | `styles.ts` | Print-optimized CSS (A4, 15mm top / 20mm side / 25mm bottom margins, orange accents), page footer HTML (PlanB logo + optional corporate logo centered together + page number) |
 | `cover.ts` | Cover page (title, code, lang, date, goal, objectives, quiz count, optional instructor section) |
-| `course.ts` | TOC with anchors, course body (parts + chapters), final page with QR code |
+| `course.ts` | TOC with anchors, course body (parts + chapters), final page (credits, review QR, Discord QR, CTAs) |
 | `quiz.ts` | Shuffled questions (A/B/C/D), answer key with explanations |
 
 ---
@@ -469,3 +479,4 @@ The course list and per-course languages are cached in-memory for 10 minutes.
 **v2.2.0** — Page footer (PlanB logo + page numbers), instructor/presenter section on cover, print pipeline uses pre-paginated HTML, tighter typography
 **v2.3.0** — Client-side course name resolution (avoids worker rate-limiting), reduced top margin (15mm), improved print visibility for dividers and footer lines
 **v2.3.1** — Footer logos centered together (removed × separator), no footer on cover page
+**v2.4.0** — Redesigned final page with credits (teacher, contributors, proofreaders via GraphQL), review QR, Discord contribute QR, GitHub source link, CTAs; PlanB pill logo in Nav/print; UI text refresh

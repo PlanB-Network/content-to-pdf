@@ -61,7 +61,7 @@
 <div class="space-y-8">
   <!-- Generator form -->
   <div class="rounded-xl border border-zinc-700 bg-zinc-900 p-6">
-    <h2 class="mb-4 text-lg font-bold text-zinc-100">Generate PDF</h2>
+    <h2 class="mb-4 text-lg font-bold text-zinc-100">Pick a course and teach it locally</h2>
     <GeneratorForm
       courses={data.courses}
       {loading}

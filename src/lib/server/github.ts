@@ -222,8 +222,8 @@ export async function fetchQuizQuestions(
   const sortedDirs = [...questionDirs].sort();
   const questions: QuizQuestion[] = [];
 
-  // Fetch each question in parallel
-  const fetchPromises = sortedDirs.map(async (dir) => {
+  // Fetch each question with concurrency limit to avoid rate limiting
+  const results = await mapConcurrent(sortedDirs, 10, async (dir) => {
     try {
       // Fetch question.yml
       const qRes = await fetch(`${RAW_BASE}/${dir}/question.yml`);
@@ -263,8 +263,6 @@ export async function fetchQuizQuestions(
     }
   });
 
-  const results = await Promise.all(fetchPromises);
-
   for (const result of results) {
     if (result) {
       questions.push({
@@ -297,6 +295,99 @@ export async function fetchCourseLastCommit(
   } catch {
     return null;
   }
+}
+
+// Professor name cache (UUID → name)
+let professorMapCache: { data: Map<string, string>; timestamp: number } | null = null;
+
+async function loadProfessorMap(platform: App.Platform | undefined): Promise<Map<string, string>> {
+  if (professorMapCache && Date.now() - professorMapCache.timestamp < CACHE_TTL) {
+    return professorMapCache.data;
+  }
+
+  const token = getEnv('GITHUB_TOKEN', platform);
+  if (!token) return new Map();
+
+  const query = `{
+    repository(owner: "${BEC_OWNER}", name: "${BEC_REPO}") {
+      object(expression: "${BEC_BRANCH}:professors") {
+        ... on Tree {
+          entries {
+            name
+            type
+            object {
+              ... on Tree {
+                entries {
+                  name
+                  object {
+                    ... on Blob { text }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }`;
+
+  try {
+    const res = await fetch('https://api.github.com/graphql', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'User-Agent': 'content-to-pdf'
+      },
+      body: JSON.stringify({ query })
+    });
+
+    if (!res.ok) return new Map();
+
+    const data = await res.json();
+    const nameMap = new Map<string, string>();
+
+    const entries = data?.data?.repository?.object?.entries;
+    if (!Array.isArray(entries)) return new Map();
+
+    for (const dir of entries) {
+      if (dir.type !== 'tree') continue;
+      const files = dir.object?.entries;
+      if (!Array.isArray(files)) continue;
+
+      const profFile = files.find((f: { name: string }) => f.name === 'professor.yml');
+      if (!profFile?.object?.text) continue;
+
+      try {
+        const yml = parseYaml(profFile.object.text) as { id?: string; name?: string };
+        if (yml.id && yml.name) {
+          nameMap.set(yml.id, yml.name);
+        }
+      } catch {
+        // Skip malformed YAML
+      }
+    }
+
+    professorMapCache = { data: nameMap, timestamp: Date.now() };
+    return nameMap;
+  } catch {
+    return new Map();
+  }
+}
+
+/**
+ * Resolve professor UUIDs to display names via GraphQL.
+ * Returns names in the same order as the input IDs (skipping unresolved ones).
+ */
+export async function fetchProfessorNames(
+  professorIds: string[],
+  platform: App.Platform | undefined
+): Promise<string[]> {
+  if (professorIds.length === 0) return [];
+  const map = await loadProfessorMap(platform);
+  return professorIds
+    .map((id) => map.get(id))
+    .filter((name): name is string => !!name);
 }
 
 /**

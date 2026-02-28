@@ -139,6 +139,8 @@ export function cleanContent(content: string): string {
   );
   c = c.replace(/^\s*(true|false)\s*$/gm, '');
   c = c.replace(/^https?:\/\/[^\s]+\s*$/gm, '');
+  // Remove YouTube video embeds (markdown image syntax with YouTube URLs)
+  c = c.replace(/^!\[[^\]]*\]\(https?:\/\/(?:www\.)?(?:youtu\.be|youtube\.com)[^)]*\)\s*$/gm, '');
   c = c.replace(/^---\s*\n.*?name:.*?\n---\s*$/gms, '');
   c = c.replace(/\n{3,}/g, '\n\n');
   return c.trim();

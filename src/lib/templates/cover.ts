@@ -1,5 +1,6 @@
 import { formatCourseCode, getLanguageName, getTodayDate, escapeHtml } from '../utils.js';
 import { t } from '../i18n.js';
+import { PLANB_LOGO_SVG } from './styles.js';
 import type { Translations } from '../types.js';
 
 export interface CoverOptions {
@@ -60,24 +61,21 @@ export function generateCoverHtml(options: CoverOptions): string {
     `;
   }
 
-  let instructorHtml = '';
-  if (presenterName || presenterLogo) {
-    const logoImg = presenterLogo
-      ? `<div class="instructor-logo-wrap"><img class="instructor-logo" src="${presenterLogo}" alt="" /></div>`
-      : '';
-    const nameLine = presenterName
-      ? `<div class="instructor-name-line">Instructor: ${escapeHtml(presenterName)}</div>`
-      : '';
-    instructorHtml = `
-      <div class="instructor-section">
-        ${logoImg}
-        <hr class="instructor-divider" />
-        ${nameLine}
-        <div class="instructor-source">Original material taken from planb.academy, fully open source for educational usage.</div>
-        <hr class="instructor-divider" />
-      </div>
-    `;
-  }
+  const isCustomPresenter = !!(presenterName || presenterLogo);
+  const displayName = presenterName || 'PlanB Academy';
+  const logoHtml = presenterLogo
+    ? `<div class="instructor-logo-wrap"><img class="instructor-logo" src="${presenterLogo}" alt="" /></div>`
+    : `<div class="instructor-logo-wrap">${PLANB_LOGO_SVG.replace('class="pdf-footer-logo"', 'class="instructor-logo-svg"')}</div>`;
+
+  const instructorHtml = `
+    <div class="instructor-section">
+      ${logoHtml}
+      <hr class="instructor-divider" />
+      <div class="instructor-name-line">Instructor: ${escapeHtml(displayName)}</div>
+      ${isCustomPresenter ? '<div class="instructor-source">Original material taken from planb.academy, fully open source for educational usage.</div>' : ''}
+      <hr class="instructor-divider" />
+    </div>
+  `;
 
   return `
     <div class="cover-page">
@@ -87,10 +85,10 @@ export function generateCoverHtml(options: CoverOptions): string {
       ${quizSubtitle}
       <p class="cover-meta">${langName} | ${today}</p>
 
-      <div class="cover-goal">
+      ${!isQuiz ? `<div class="cover-goal">
         <div class="cover-goal-label">${escapeHtml(translatedGoal)}</div>
         ${escapeHtml(goal)}
-      </div>
+      </div>` : ''}
 
       ${objectivesHtml}
     </div>

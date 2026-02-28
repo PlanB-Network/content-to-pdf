@@ -249,44 +249,46 @@
           bind:checked={includeAnswers}
           class="rounded border-zinc-600 bg-zinc-800 text-planb-orange accent-planb-orange focus:ring-planb-orange"
         />
-        <span class="text-sm text-zinc-400">Include answer key</span>
+        <span class="text-sm text-zinc-400">Include answers</span>
       </label>
     </div>
   {/if}
 
   <!-- Instructor (optional) -->
-  <div class="space-y-3">
-    <span class="block text-sm font-semibold text-zinc-200">Instructor <span class="font-normal text-zinc-500">(optional)</span></span>
-    <div>
-      <label for="presenter-name" class="mb-1 block text-sm text-zinc-400">Name</label>
-      <input
-        id="presenter-name"
-        type="text"
-        bind:value={presenterName}
-        placeholder="Your name or organization"
-        class="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:border-planb-orange focus:outline-none focus:ring-1 focus:ring-planb-orange"
-      />
-    </div>
-    <div>
-      <label for="presenter-logo" class="mb-1 block text-sm text-zinc-400">Logo</label>
-      <input
-        id="presenter-logo"
-        type="file"
-        accept="image/*"
-        onchange={handleLogoFile}
-        class="w-full text-sm text-zinc-400 file:mr-3 file:rounded-lg file:border-0 file:bg-zinc-700 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-zinc-200 hover:file:bg-zinc-600"
-      />
-    </div>
-    {#if presenterLogo}
-      <div class="flex items-center gap-3 rounded-lg border border-zinc-700 bg-zinc-800/50 p-2">
-        <img src={presenterLogo} alt="Logo preview" class="h-8 max-w-[80px] object-contain" />
-        <button
-          type="button"
-          onclick={() => { presenterLogo = ''; }}
-          class="text-xs text-zinc-500 hover:text-red-400"
-        >&times; Remove</button>
+  <div class="rounded-lg bg-zinc-800/40 border border-zinc-700/50 p-3">
+    <span class="mb-2 block text-xs font-medium text-zinc-500">Instructor (optional)</span>
+    <div class="flex gap-3">
+      <div class="flex-1">
+        <label for="presenter-name" class="mb-1 block text-xs font-medium text-zinc-400">Name</label>
+        <input
+          id="presenter-name"
+          type="text"
+          bind:value={presenterName}
+          placeholder="Name or organization"
+          class="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-2.5 py-1.5 text-xs text-zinc-300 placeholder-zinc-500 focus:border-planb-orange focus:outline-none focus:ring-1 focus:ring-planb-orange"
+        />
       </div>
-    {/if}
+      <div class="flex-1">
+        <label for="presenter-logo" class="mb-1 block text-xs font-medium text-zinc-400">Logo <span class="text-zinc-600">(dark bg recommended)</span></label>
+        <div class="flex items-center gap-2">
+          {#if presenterLogo}
+            <img src={presenterLogo} alt="Logo" class="h-[26px] max-w-[60px] object-contain" />
+            <button
+              type="button"
+              onclick={() => { presenterLogo = ''; }}
+              class="text-xs text-zinc-500 hover:text-red-400"
+            >&times;</button>
+          {/if}
+          <input
+            id="presenter-logo"
+            type="file"
+            accept="image/*"
+            onchange={handleLogoFile}
+            class="w-full text-xs text-zinc-400 file:mr-2 file:rounded-lg file:border-0 file:bg-zinc-700 file:px-2.5 file:py-1.5 file:text-xs file:font-medium file:text-zinc-200 hover:file:bg-zinc-600"
+          />
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Generate button -->

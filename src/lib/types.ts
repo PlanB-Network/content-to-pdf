@@ -39,4 +39,11 @@ export interface ShuffledQuestion {
   explanation: string;
 }
 
+export interface CourseCredits {
+  teachers: string[];
+  contributors: string[];
+  proofreaders: string[];
+  originalLanguage: string;
+}
+
 export type Translations = Record<string, unknown>;

@@ -22,7 +22,20 @@ const DEFAULTS: Record<string, string> = {
   'courses.quizz.quizz': 'Quiz',
   'courses.exam.answersReview': 'Answers review',
   'courses.exam.finalExam': 'Final exam',
-  'courses.exam.explanations': 'Explanations'
+  'courses.exam.explanations': 'Explanations',
+  'courses.final.endOfCourse': 'End of',
+  'courses.final.thankYouCompleting': 'Thank you for completing this course.',
+  'courses.final.leaveReview': 'If you enjoyed this course, please leave a review on the platform.',
+  'courses.final.credits': 'Credits',
+  'courses.final.teacher': 'Teacher',
+  'courses.final.contributors': 'Contributors',
+  'courses.final.proofreaders': 'Proofreaders',
+  'courses.final.license': 'License',
+  'courses.final.source': 'Source',
+  'courses.final.contribute': 'If you want to contribute or make improvements, feel free to join our community or create a PR.',
+  'courses.final.discoverMore': 'Discover more courses on',
+  'courses.final.thankYouDedication': 'Thank you for your dedication to Bitcoin study.',
+  'courses.final.thankYouInstructor': 'Thank you to the instructor who chose to use our free and open-source educational content.'
 };
 
 function getNestedValue(obj: Translations, keyPath: string): string | undefined {

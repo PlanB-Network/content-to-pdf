@@ -1,11 +1,12 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types.js';
-import type { GenerateRequest, Translations } from '$lib/types.js';
+import type { CourseCredits, GenerateRequest, Translations } from '$lib/types.js';
 import {
   fetchCourseMarkdown,
   fetchCourseYml,
   fetchQuizQuestions,
-  fetchLocaleFile
+  fetchLocaleFile,
+  fetchProfessorNames
 } from '$lib/server/github.js';
 import { parseCourseMarkdown } from '$lib/markdown.js';
 import { generateCoverHtml } from '$lib/templates/cover.js';
@@ -52,6 +53,26 @@ async function generateCourseHtml(
 
   const parsed = parseCourseMarkdown(rawMd);
 
+  // Resolve credits data
+  const professorIds = (courseYml.professors_id as string[]) || [];
+  const teachers = await fetchProfessorNames(professorIds, platform);
+  const contributorNames = (courseYml.contributor_names as string[]) || [];
+  const originalLanguage = (courseYml.original_language as string) || '';
+
+  const proofreadingEntries = (courseYml.proofreading as Array<{
+    language: string;
+    contributor_names?: string[];
+  }>) || [];
+  const langProof = proofreadingEntries.find((p) => p.language === lang);
+  const proofreaders = langProof?.contributor_names || [];
+
+  const credits: CourseCredits = {
+    teachers,
+    contributors: contributorNames,
+    proofreaders,
+    originalLanguage
+  };
+
   const coverHtml = generateCoverHtml({
     courseCode: code,
     lang,
@@ -79,9 +100,14 @@ async function generateCourseHtml(
   );
 
   const finalHtml = generateFinalPageHtml(
+    code,
     courseYml.id as string,
+    parsed.frontmatter.name || code.toUpperCase(),
     parsed.reviewChapterId,
-    lang
+    lang,
+    credits,
+    locales.locale,
+    locales.enLocale
   );
 
   const title = parsed.frontmatter.name || code.toUpperCase();

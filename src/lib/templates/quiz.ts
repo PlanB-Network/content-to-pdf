@@ -67,10 +67,7 @@ export function generateAnswerKeyHtml(
 ): string {
   const answersLabel = t(locale, enLocale, 'courses.exam.answersReview');
 
-  let html = `
-    <div class="answer-key">
-      <div class="answer-key-title">${escapeHtml(answersLabel)}</div>
-  `;
+  let html = `<div class="answer-key answer-key-title">${escapeHtml(answersLabel)}</div>\n`;
 
   for (const q of questions) {
     html += `
@@ -84,6 +81,5 @@ export function generateAnswerKeyHtml(
     `;
   }
 
-  html += '</div>';
   return html;
 }
