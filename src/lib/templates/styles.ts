@@ -4,7 +4,7 @@ export function getSharedCss(): string {
   return `
     @page {
       size: A4;
-      margin: 15mm 20mm;
+      margin: 0;
     }
     * { box-sizing: border-box; }
     body {
@@ -12,7 +12,7 @@ export function getSharedCss(): string {
       line-height: 1.65;
       color: #1a1a1a;
       margin: 0;
-      padding: 0;
+      padding: 10mm 20mm;
       background: white;
       font-size: 11pt;
     }

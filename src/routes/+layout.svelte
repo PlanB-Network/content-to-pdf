@@ -40,7 +40,7 @@
           </svg>
         </a>
         <a
-          href="#best-practices"
+          href="/best-practices"
           class="transition-colors hover:text-zinc-300"
         >
           Best Practices

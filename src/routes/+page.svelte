@@ -11,7 +11,7 @@
   let generatedTitle = $state('');
   let savedTitle = $state('');
   let showSuccess = $state(false);
-  let bestPracticesOpen = $state(false);
+
 
   async function handleGenerate(params: {
     code: string;
@@ -33,11 +33,18 @@
         body: JSON.stringify(params)
       });
 
-      const result = await res.json();
-
       if (!res.ok) {
-        throw new Error(result.error || 'Generation failed');
+        let errorMsg = 'Generation failed';
+        try {
+          const body = await res.json();
+          errorMsg = body.error || errorMsg;
+        } catch {
+          // Response body is not JSON (e.g. platform HTML error page)
+        }
+        throw new Error(errorMsg);
       }
+
+      const result = await res.json();
 
       generatedHtml = result.html;
       generatedTitle = result.title;
@@ -123,45 +130,4 @@
       </div>
     </div>
   {/if}
-
-  <!-- Best Practices -->
-  <div id="best-practices" class="rounded-xl border border-zinc-700 bg-zinc-900">
-    <button
-      onclick={() => bestPracticesOpen = !bestPracticesOpen}
-      class="flex w-full items-center justify-between p-5 text-left transition-colors hover:bg-zinc-800/50 rounded-xl"
-    >
-      <span class="text-sm font-semibold text-zinc-200">Best Practices</span>
-      <svg
-        class="h-4 w-4 text-zinc-400 transition-transform duration-200 {bestPracticesOpen ? 'rotate-180' : ''}"
-        fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
-      >
-        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-      </svg>
-    </button>
-
-    {#if bestPracticesOpen}
-      <div class="border-t border-zinc-700 px-5 pb-5 pt-4 text-sm text-zinc-400 space-y-4">
-        <div>
-          <h3 class="mb-1 font-semibold text-zinc-200">Black text in corners?</h3>
-          <p>
-            When saving as PDF, your browser may print its own headers and footers
-            (page title, URL, date, page number) as small black text in the page corners.
-            This is not part of the generated document — it is added by the browser itself.
-          </p>
-        </div>
-        <div>
-          <h3 class="mb-1 font-semibold text-zinc-200">How to remove it</h3>
-          <ol class="list-decimal space-y-1 pl-5">
-            <li>In the print dialog, click <span class="font-medium text-zinc-300">More settings</span>.</li>
-            <li>Uncheck <span class="font-medium text-zinc-300">Headers and footers</span>.</li>
-            <li>Save as PDF as usual.</li>
-          </ol>
-          <p class="mt-2 text-zinc-500">
-            Tip: When you choose "Save as PDF" as the destination (instead of a physical printer),
-            most browsers disable headers and footers by default.
-          </p>
-        </div>
-      </div>
-    {/if}
-  </div>
 </div>

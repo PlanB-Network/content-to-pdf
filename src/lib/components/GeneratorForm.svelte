@@ -49,7 +49,10 @@
       loadingLangs = true;
       selectedLang = '';
       fetch(`/api/languages?code=${encodeURIComponent(selectedCode)}`)
-        .then((res) => res.json())
+        .then((res) => {
+          if (!res.ok) throw new Error(`Failed to fetch languages (${res.status})`);
+          return res.json();
+        })
         .then((langs: string[]) => {
           availableLanguages = langs;
           selectedLang = langs.includes('en') ? 'en' : langs[0] ?? '';
