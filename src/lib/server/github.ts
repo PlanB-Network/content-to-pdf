@@ -35,18 +35,19 @@ function authHeaders(platform: App.Platform | undefined): Record<string, string>
  */
 async function fetchCourseMeta(
   code: string
-): Promise<{ level: string; topic: string }> {
+): Promise<{ level: string; topic: string; testOnly: boolean }> {
   try {
     const url = `${RAW_BASE}/courses/${code}/course.yml`;
     const res = await fetch(url);
-    if (!res.ok) return { level: '', topic: '' };
+    if (!res.ok) return { level: '', topic: '', testOnly: false };
     const yml = parseYaml(await res.text()) as Record<string, unknown>;
     return {
       level: (yml.level as string) || '',
-      topic: (yml.topic as string) || ''
+      topic: (yml.topic as string) || '',
+      testOnly: yml.test_only === true
     };
   } catch {
-    return { level: '', topic: '' };
+    return { level: '', topic: '', testOnly: false };
   }
 }
 
@@ -101,13 +102,17 @@ export async function listCourses(platform: App.Platform | undefined): Promise<C
   // Fetch metadata with limited concurrency (names resolved client-side)
   const infos = await mapConcurrent(codes, 10, (code) => fetchCourseMeta(code));
 
-  const courses: CourseInfo[] = codes.map((code, i) => ({
-    code,
-    name: '',
-    level: infos[i].level,
-    topic: infos[i].topic,
-    languages: []
-  }));
+  const courses: CourseInfo[] = codes
+    .map((code, i) => ({
+      code,
+      name: '',
+      level: infos[i].level,
+      topic: infos[i].topic,
+      languages: [],
+      _testOnly: infos[i].testOnly
+    }))
+    .filter((c) => !c._testOnly)
+    .map(({ _testOnly, ...rest }) => rest);
 
   // Sort by prefix alphabetically, then by number within each prefix
   courses.sort((a, b) => {
