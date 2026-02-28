@@ -16,6 +16,8 @@ export interface CoverOptions {
   questionCount?: number;
   locale: Translations | null;
   enLocale: Translations | null;
+  presenterName?: string;
+  presenterLogo?: string;
 }
 
 export function generateCoverHtml(options: CoverOptions): string {
@@ -28,7 +30,9 @@ export function generateCoverHtml(options: CoverOptions): string {
     isQuiz,
     questionCount,
     locale,
-    enLocale
+    enLocale,
+    presenterName,
+    presenterLogo
   } = options;
 
   const today = getTodayDate();
@@ -56,8 +60,28 @@ export function generateCoverHtml(options: CoverOptions): string {
     `;
   }
 
+  let instructorHtml = '';
+  if (presenterName || presenterLogo) {
+    const logoImg = presenterLogo
+      ? `<div class="instructor-logo-wrap"><img class="instructor-logo" src="${presenterLogo}" alt="" /></div>`
+      : '';
+    const nameLine = presenterName
+      ? `<div class="instructor-name-line">Instructor: ${escapeHtml(presenterName)}</div>`
+      : '';
+    instructorHtml = `
+      <div class="instructor-section">
+        ${logoImg}
+        <hr class="instructor-divider" />
+        ${nameLine}
+        <div class="instructor-source">Original material taken from planb.academy, fully open source for educational usage.</div>
+        <hr class="instructor-divider" />
+      </div>
+    `;
+  }
+
   return `
     <div class="cover-page">
+      ${instructorHtml}
       <h1 class="cover-title">${escapeHtml(name)}</h1>
       <p class="cover-code">${formattedCode}</p>
       ${quizSubtitle}

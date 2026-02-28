@@ -19,6 +19,8 @@
     mode: 'course' | 'quiz';
     count?: number;
     answers: boolean;
+    presenterName?: string;
+    presenterLogo?: string;
   }) {
     loading = true;
     error = '';

@@ -6,7 +6,7 @@
 
 | | |
 |---|---|
-| **Version** | 2.1.0 |
+| **Version** | 2.2.0 |
 | **Stack** | SvelteKit 2 · Svelte 5 (runes) · Tailwind CSS v4 · TypeScript |
 | **Runtime** | OpenWorkers (Cloudflare Workers-compatible edge) |
 | **Dev** | Bun / Vite 7 |
@@ -118,12 +118,13 @@ content-to-pdf/
    - Splits into parts (`# Title` + `<partId>`) and chapters (`## Title` + `<chapterId>`)
    - Cleans metadata tags, UUIDs, stray lines
 4. Generates HTML sections:
-   - **Cover page** — title, code, language, date, goal, objectives
+   - **Cover page** — title, code, language, date, goal, objectives; optional instructor name/logo
    - **Table of contents** — numbered list with anchor links
    - **Body** — part headers + chapter headers + rendered markdown content
    - **Final page** — QR code linking to the course review page
+   - **Page footer** — PlanB Academy logo + optional corporate logo + page numbers (on every page)
 5. Wraps everything in a complete HTML document with print-optimized CSS
-6. Client displays in an iframe; "Save as PDF" opens browser print dialog
+6. Client displays in a paginated iframe preview; "Save as PDF" extracts the paginated HTML and opens browser print dialog
 
 ### Quiz PDF Generation
 
@@ -173,7 +174,9 @@ Generates a complete printable HTML document.
   "lang": "en",
   "mode": "course",
   "count": 20,
-  "answers": true
+  "answers": true,
+  "presenterName": "Alice",
+  "presenterLogo": "data:image/png;base64,..."
 }
 ```
 
@@ -184,6 +187,8 @@ Generates a complete printable HTML document.
 | `mode` | `"course"` \| `"quiz"` | yes | Generation mode |
 | `count` | number | no | Limit quiz to N random questions |
 | `answers` | boolean | no | Include answer key (quiz only) |
+| `presenterName` | string | no | Instructor name shown on cover page |
+| `presenterLogo` | string | no | Instructor logo URL/data-URI (cover + page footer) |
 
 **Response:**
 ```json
@@ -214,6 +219,8 @@ interface GenerateRequest {
   mode: 'course' | 'quiz';
   count?: number;
   answers?: boolean;
+  presenterName?: string;
+  presenterLogo?: string;
 }
 interface GenerateResponse {
   html: string;
@@ -258,6 +265,7 @@ Sticky header with Plan B logo, app title, and branding.
 - `selectedCode`, `selectedLang` — current selections
 - `mode` — `'course'` | `'quiz'`
 - `questionCount`, `includeAnswers` — quiz options
+- `presenterName`, `presenterLogo` — optional instructor info
 - `availableLanguages`, `loadingLangs` — dynamic language loading
 
 **Derived ($derived):**
@@ -273,7 +281,8 @@ Sticky header with Plan B logo, app title, and branding.
 3. Language selector (lazy-loaded per course)
 4. Mode toggle (Course PDF / Quiz PDF)
 5. Quiz options (count + answer key checkbox, shown when quiz mode)
-6. Generate button (disabled until course + lang selected)
+6. Instructor section (optional name + logo file upload with data-URI preview)
+7. Generate button (disabled until course + lang selected)
 
 ### PdfPreview.svelte
 
@@ -286,16 +295,18 @@ Sticky header with Plan B logo, app title, and branding.
 
 **Behavior:**
 - Injects a pagination script into the iframe that splits content into A4-sized pages
-- Pages are measured and laid out using DOM measurement (794×1123 px per page, 76px horizontal / 38px vertical padding)
-- Respects page break hints: `break-before` on part headers, chapter headers, final page, answer key; `break-after` on cover page, TOC page
+- Pages are measured using DOM `scrollHeight` with margin collapse (794×1123 px per page, 76px padding on all sides)
+- Respects page break hints: `break-before` on chapter headers, final page, answer key; `break-after` on cover page, TOC page
+- Part headers are pulled forward to stay with their first chapter when a page break occurs
+- Waits for all images to load before paginating
+- **Page footer**: PlanB Academy logo + optional corporate logo + page number cloned into every page
 - **Single view**: pages stacked vertically with shadow and page numbers ("N / total")
 - **Grid view**: pages shown as thumbnails (0.3274× scale); clicking a page switches to single view and scrolls to it
 - View mode toggle buttons in the toolbar (single page / grid icons)
 - Page count badge displayed next to the title
 - Communication between parent and iframe via `postMessage` (`pdfPreviewReady`, `setViewMode`, `pdfViewModeChanged`)
-- "Save as PDF" opens a new window with overlay + print dialog
+- **"Save as PDF"**: extracts the already-paginated HTML from the preview iframe (including footer clones), strips scripts, injects print-specific CSS (`@page { margin: 0 }`, `.pdf-page { 210mm × 297mm; padding: 20mm }`), and opens the browser print dialog
 - Overlay shows spinner, instructions, Plan B branding (screen-only, hidden in print)
-- Waits for images to load, then triggers `window.print()` after 500ms delay
 
 ### +page.svelte (Main Page)
 
@@ -344,8 +355,8 @@ Covers 25+ keys: `words.course`, `courses.details.curriculum`, `courses.exam.ans
 
 | File | Generates |
 |---|---|
-| `styles.ts` | Print-optimized CSS (A4, 20mm @page margins, orange accents) |
-| `cover.ts` | Cover page (title, code, lang, date, goal, objectives, quiz count) |
+| `styles.ts` | Print-optimized CSS (A4, 20mm margins, orange accents), page footer HTML (PlanB logo + optional corporate logo + page number) |
+| `cover.ts` | Cover page (title, code, lang, date, goal, objectives, quiz count, optional instructor section) |
 | `course.ts` | TOC with anchors, course body (parts + chapters), final page with QR code |
 | `quiz.ts` | Shuffled questions (A/B/C/D), answer key with explanations |
 
@@ -451,3 +462,4 @@ The course list and per-course languages are cached in-memory for 10 minutes.
 **v1.0.0** — CLI tool using Puppeteer, local filesystem, commander.js
 **v2.0.0** — Web app (SvelteKit + OpenWorkers), GitHub API, browser print, lazy language loading
 **v2.1.0** — Paginated PDF preview with single/grid view modes, proper @page margins
+**v2.2.0** — Page footer (PlanB logo + page numbers), instructor/presenter section on cover, print pipeline uses pre-paginated HTML, tighter typography

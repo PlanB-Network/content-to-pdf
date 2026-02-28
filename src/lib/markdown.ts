@@ -167,5 +167,10 @@ export function renderMarkdown(md: string, courseCode: string, lang: string): st
     }
   );
 
-  return mdi.render(processed);
+  let html = mdi.render(processed);
+
+  // Wrap standalone image paragraphs in a div for reliable page-break avoidance
+  html = html.replace(/<p>(\s*<img[^>]*\/?\s*>\s*)<\/p>/g, '<div class="img-wrap">$1</div>');
+
+  return html;
 }

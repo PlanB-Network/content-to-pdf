@@ -14,7 +14,7 @@
   <main class="mx-auto w-full max-w-4xl flex-1 px-4 py-8">
     {@render children()}
   </main>
-  <footer class="border-t border-zinc-700 bg-zinc-900 px-6 py-4">
+  <footer class="sticky bottom-0 z-50 border-t border-zinc-700 bg-zinc-900 px-6 py-4">
     <div class="mx-auto flex max-w-4xl items-center justify-between text-sm text-zinc-500">
       <div class="flex items-center gap-4">
         <a

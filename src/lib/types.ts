@@ -12,6 +12,8 @@ export interface GenerateRequest {
   mode: 'course' | 'quiz';
   count?: number;
   answers?: boolean;
+  presenterName?: string;
+  presenterLogo?: string;
 }
 
 export interface GenerateResponse {

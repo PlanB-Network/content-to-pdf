@@ -10,6 +10,8 @@
       mode: 'course' | 'quiz';
       count?: number;
       answers: boolean;
+      presenterName?: string;
+      presenterLogo?: string;
     }) => void;
   }
 
@@ -22,8 +24,24 @@
   let mode = $state<'course' | 'quiz'>('course');
   let questionCount = $state('');
   let includeAnswers = $state(false);
+  let presenterName = $state('');
+  let presenterLogo = $state('');
   let availableLanguages = $state<string[]>([]);
   let loadingLangs = $state(false);
+
+  function handleLogoFile(e: Event) {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) {
+      presenterLogo = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      presenterLogo = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  }
 
   // Derive unique filter values from courses
   const levelOrder = ['beginner', 'intermediate', 'advanced', 'expert'];
@@ -77,7 +95,9 @@
       lang: selectedLang,
       mode,
       count: questionCount ? parseInt(questionCount) : undefined,
-      answers: includeAnswers
+      answers: includeAnswers,
+      presenterName: presenterName.trim() || undefined,
+      presenterLogo: presenterLogo || undefined
     });
   }
 </script>
@@ -206,6 +226,41 @@
       </label>
     </div>
   {/if}
+
+  <!-- Instructor (optional) -->
+  <div class="space-y-3">
+    <span class="block text-sm font-semibold text-zinc-200">Instructor <span class="font-normal text-zinc-500">(optional)</span></span>
+    <div>
+      <label for="presenter-name" class="mb-1 block text-sm text-zinc-400">Name</label>
+      <input
+        id="presenter-name"
+        type="text"
+        bind:value={presenterName}
+        placeholder="Your name or organization"
+        class="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:border-planb-orange focus:outline-none focus:ring-1 focus:ring-planb-orange"
+      />
+    </div>
+    <div>
+      <label for="presenter-logo" class="mb-1 block text-sm text-zinc-400">Logo</label>
+      <input
+        id="presenter-logo"
+        type="file"
+        accept="image/*"
+        onchange={handleLogoFile}
+        class="w-full text-sm text-zinc-400 file:mr-3 file:rounded-lg file:border-0 file:bg-zinc-700 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-zinc-200 hover:file:bg-zinc-600"
+      />
+    </div>
+    {#if presenterLogo}
+      <div class="flex items-center gap-3 rounded-lg border border-zinc-700 bg-zinc-800/50 p-2">
+        <img src={presenterLogo} alt="Logo preview" class="h-8 max-w-[80px] object-contain" />
+        <button
+          type="button"
+          onclick={() => { presenterLogo = ''; }}
+          class="text-xs text-zinc-500 hover:text-red-400"
+        >&times; Remove</button>
+      </div>
+    {/if}
+  </div>
 
   <!-- Generate button -->
   <button

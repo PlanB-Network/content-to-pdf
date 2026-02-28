@@ -13,13 +13,28 @@
   let pageCount = $state(0);
 
   function openPrintWindow() {
+    const iframeDoc = iframeEl?.contentDocument;
+    if (!iframeDoc) {
+      alert('Preview not ready yet. Please wait and try again.');
+      return;
+    }
+
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       alert('Please allow popups to save as PDF.');
       return;
     }
 
-    const overlayStyles = `
+    // Extract already-paginated HTML from the preview iframe
+    let printHtml = '<!DOCTYPE html>' + iframeDoc.documentElement.outerHTML;
+
+    // Remove scripts so pagination doesn't re-run
+    printHtml = printHtml.replace(/<script[\s\S]*?<\/script>/gi, '');
+
+    // Print-specific overrides: zero page margin (padding is inside .pdf-page),
+    // proper page sizing, overlay for the waiting screen
+    const printCss = `
+      @page { size: A4; margin: 0; }
       @media screen {
         body > *:not(.print-overlay) { display: none !important; }
         .print-overlay {
@@ -35,46 +50,35 @@
           padding: 40px;
         }
         .print-overlay .logo {
-          width: 56px;
-          height: 56px;
-          border-radius: 50%;
-          background: #FF5C00;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 24px;
-          font-weight: 800;
-          color: white;
-          margin-bottom: 24px;
+          width: 56px; height: 56px; border-radius: 50%;
+          background: #FF5C00; display: flex; align-items: center;
+          justify-content: center; font-size: 24px; font-weight: 800;
+          color: white; margin-bottom: 24px;
         }
-        .print-overlay h1 {
-          font-size: 20px;
-          font-weight: 700;
-          margin: 0 0 8px 0;
-          color: #fafafa;
-        }
-        .print-overlay p {
-          font-size: 14px;
-          color: #a1a1aa;
-          margin: 0 0 32px 0;
-        }
+        .print-overlay h1 { font-size: 20px; font-weight: 700; margin: 0 0 8px; color: #fafafa; }
+        .print-overlay p { font-size: 14px; color: #a1a1aa; margin: 0 0 32px; }
         .print-overlay .spinner {
-          width: 32px;
-          height: 32px;
-          border: 3px solid #27272a;
-          border-top-color: #FF5C00;
-          border-radius: 50%;
+          width: 32px; height: 32px; border: 3px solid #27272a;
+          border-top-color: #FF5C00; border-radius: 50%;
           animation: spin 0.8s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
-        .print-overlay .hint {
-          margin-top: 32px;
-          font-size: 12px;
-          color: #52525b;
-        }
+        .print-overlay .hint { margin-top: 32px; font-size: 12px; color: #52525b; }
       }
       @media print {
         .print-overlay { display: none !important; }
+        body {
+          display: block !important;
+          background: white !important;
+          padding: 0 !important;
+          margin: 0 !important;
+        }
+        .pdf-page {
+          width: 210mm;
+          height: 297mm;
+          padding: 20mm;
+          box-sizing: border-box;
+        }
       }
     `;
 
@@ -88,15 +92,11 @@
       </div>
     `;
 
-    const modifiedHtml = html.replace(
-      '</head>',
-      `<style>${overlayStyles}</style></head>`
-    ).replace(
-      '<body>',
-      `<body>${overlayHtml}`
-    );
+    printHtml = printHtml
+      .replace('</head>', `<style>${printCss}</style></head>`)
+      .replace(/(<body[^>]*>)/, `$1${overlayHtml}`);
 
-    printWindow.document.write(modifiedHtml);
+    printWindow.document.write(printHtml);
     printWindow.document.close();
 
     printWindow.onload = () => {
@@ -142,14 +142,39 @@
         width: 794px;
         height: 1123px;
         background: white;
-        padding: 38px 76px;
+        padding: 76px;
         box-sizing: border-box;
         overflow: hidden;
+      }
+
+      .pdf-page {
+        position: relative;
       }
 
       .pdf-page .cover-page,
       .pdf-page .final-page {
         min-height: 0 !important;
+      }
+
+      /* Footer clones inside each preview page */
+      .pdf-footer-clone {
+        position: absolute;
+        bottom: 30px;
+        left: 76px;
+        right: 76px;
+        display: flex !important;
+        align-items: center;
+        justify-content: space-between;
+        padding-top: 4px;
+        border-top: 0.5px solid #ddd;
+        font-size: 7px;
+        color: #999;
+      }
+      .pdf-footer-clone .pdf-footer-logo {
+        height: 8px;
+      }
+      .pdf-footer-clone .pdf-footer-corporate {
+        height: 10px;
       }
 
       .pdf-page-wrapper {
@@ -226,11 +251,11 @@
       var PAGE_W = 794;
       var PAGE_H = 1123;
       var PAD_X = 76;
-      var PAD_Y = 38;
+      var PAD_Y = 76;
       var CONTENT_H = PAGE_H - PAD_Y * 2;
       var CONTENT_W = PAGE_W - PAD_X * 2;
 
-      var BREAK_BEFORE = ['part-header', 'chapter-header', 'final-page', 'answer-key'];
+      var BREAK_BEFORE = ['chapter-header', 'final-page', 'answer-key'];
       var BREAK_AFTER = ['cover-page', 'toc-page'];
 
       function hasBreakBefore(el) {
@@ -249,7 +274,19 @@
         return false;
       }
 
+      function isPartHeader(el) {
+        return el.classList && el.classList.contains('part-header');
+      }
+
       function paginate() {
+        // Extract and remove footer before pagination
+        var footerEl = document.querySelector('.pdf-footer');
+        var footerCloneSource = null;
+        if (footerEl) {
+          footerCloneSource = footerEl.cloneNode(true);
+          footerEl.remove();
+        }
+
         var els = [];
         var children = document.body.children;
         for (var i = 0; i < children.length; i++) {
@@ -262,13 +299,20 @@
 
         for (var i = 0; i < els.length; i++) els[i].remove();
 
+        // Measure elements in context (inside the div together) so margin
+        // collapse is handled naturally by the browser layout engine.
         var measure = document.createElement('div');
         measure.style.cssText = 'width:' + CONTENT_W + 'px;position:absolute;left:-9999px;top:0;visibility:hidden;padding:0;margin:0;';
         document.body.appendChild(measure);
 
         var pages = [];
         var curPage = [];
-        var curH = 0;
+
+        function flushPage() {
+          if (curPage.length > 0) pages.push(curPage);
+          curPage = [];
+          while (measure.firstChild) measure.removeChild(measure.firstChild);
+        }
 
         for (var i = 0; i < els.length; i++) {
           var el = els[i];
@@ -276,28 +320,33 @@
           var breakAfter = hasBreakAfter(el);
 
           if (breakBefore && curPage.length > 0) {
-            pages.push(curPage);
-            curPage = [];
-            curH = 0;
+            // Pull trailing part-header so it stays with this chapter
+            var pulled = null;
+            if (curPage.length > 0 && isPartHeader(curPage[curPage.length - 1])) {
+              pulled = curPage.pop();
+              measure.removeChild(pulled);
+            }
+            flushPage();
+            if (pulled) {
+              measure.appendChild(pulled);
+              curPage.push(pulled);
+            }
           }
 
           measure.appendChild(el);
-          var h = el.offsetHeight;
-          measure.removeChild(el);
 
-          if (curH > 0 && curH + h > CONTENT_H) {
-            pages.push(curPage);
-            curPage = [];
-            curH = 0;
+          // scrollHeight reflects real layout including margin collapse
+          if (curPage.length > 0 && measure.scrollHeight > CONTENT_H) {
+            // Doesn't fit — remove it, flush page, re-add on fresh page
+            measure.removeChild(el);
+            flushPage();
+            measure.appendChild(el);
           }
 
           curPage.push(el);
-          curH += h;
 
           if (breakAfter) {
-            pages.push(curPage);
-            curPage = [];
-            curH = 0;
+            flushPage();
           }
         }
 
@@ -317,6 +366,18 @@
           }
           wrapper.appendChild(page);
           document.body.appendChild(wrapper);
+        }
+
+        // Clone footer into each page
+        if (footerCloneSource) {
+          var wrappers = document.querySelectorAll('.pdf-page');
+          for (var fi = 0; fi < wrappers.length; fi++) {
+            var fClone = footerCloneSource.cloneNode(true);
+            fClone.classList.add('pdf-footer-clone');
+            var pageSpan = fClone.querySelector('.pdf-footer-page');
+            if (pageSpan) pageSpan.textContent = String(fi + 1);
+            wrappers[fi].appendChild(fClone);
+          }
         }
 
         document.body.classList.add('view-single');
@@ -343,10 +404,26 @@
         }
       });
 
+      function waitForImages() {
+        var imgs = document.querySelectorAll('img');
+        var promises = [];
+        for (var i = 0; i < imgs.length; i++) {
+          if (!imgs[i].complete) {
+            promises.push(new Promise(function(resolve) {
+              var img = imgs[i];
+              img.onload = resolve;
+              img.onerror = resolve;
+            }));
+          }
+        }
+        if (promises.length === 0) return paginate();
+        Promise.all(promises).then(paginate);
+      }
+
       if (document.readyState === 'complete') {
-        paginate();
+        waitForImages();
       } else {
-        window.addEventListener('load', paginate);
+        window.addEventListener('load', waitForImages);
       }
     })();
   `;

@@ -63,8 +63,7 @@ export function generateCourseBodyHtml(
         </div>
       `;
 
-      const rendered = renderMarkdown(ch.content, courseCode, lang);
-      html += `<div class="chapter-content">${rendered}</div>\n`;
+      html += renderMarkdown(ch.content, courseCode, lang) + '\n';
     }
   }
 

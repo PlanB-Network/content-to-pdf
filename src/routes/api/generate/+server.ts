@@ -19,7 +19,7 @@ import {
   generateQuizBodyHtml,
   generateAnswerKeyHtml
 } from '$lib/templates/quiz.js';
-import { getSharedCss } from '$lib/templates/styles.js';
+import { getSharedCss, generateFooterHtml } from '$lib/templates/styles.js';
 import { escapeHtml } from '$lib/utils.js';
 
 async function loadLocales(lang: string): Promise<{
@@ -39,7 +39,9 @@ async function loadLocales(lang: string): Promise<{
 async function generateCourseHtml(
   code: string,
   lang: string,
-  platform: App.Platform | undefined
+  platform: App.Platform | undefined,
+  presenterName?: string,
+  presenterLogo?: string
 ): Promise<{ html: string; title: string }> {
   // Fetch all data in parallel
   const [rawMd, courseYml, locales] = await Promise.all([
@@ -61,7 +63,9 @@ async function generateCourseHtml(
     type: (courseYml.type as string) || 'theory',
     topic: (courseYml.topic as string) || 'bitcoin',
     locale: locales.locale,
-    enLocale: locales.enLocale
+    enLocale: locales.enLocale,
+    presenterName,
+    presenterLogo
   });
 
   const tocHtml = generateTocHtml(parsed.parts, locales.locale, locales.enLocale);
@@ -81,6 +85,7 @@ async function generateCourseHtml(
   );
 
   const title = parsed.frontmatter.name || code.toUpperCase();
+  const footerHtml = generateFooterHtml(presenterLogo);
 
   const html = `<!DOCTYPE html>
 <html lang="${lang}">
@@ -94,6 +99,7 @@ async function generateCourseHtml(
   ${tocHtml}
   ${bodyHtml}
   ${finalHtml}
+  ${footerHtml}
 </body>
 </html>`;
 
@@ -105,7 +111,9 @@ async function generateQuizHtml(
   lang: string,
   count: number | undefined,
   answers: boolean,
-  platform: App.Platform | undefined
+  platform: App.Platform | undefined,
+  presenterName?: string,
+  presenterLogo?: string
 ): Promise<{ html: string; title: string }> {
   // Fetch all data in parallel
   const [questionsRaw, courseYml, rawMd, locales] = await Promise.all([
@@ -154,7 +162,9 @@ async function generateQuizHtml(
     isQuiz: true,
     questionCount: questions.length,
     locale: locales.locale,
-    enLocale: locales.enLocale
+    enLocale: locales.enLocale,
+    presenterName,
+    presenterLogo
   });
 
   const shuffled = shuffleQuestions(questions);
@@ -166,6 +176,7 @@ async function generateQuizHtml(
   }
 
   const title = `${courseName} - Quiz`;
+  const footerHtml = generateFooterHtml(presenterLogo);
 
   const html = `<!DOCTYPE html>
 <html lang="${lang}">
@@ -178,6 +189,7 @@ async function generateQuizHtml(
   ${coverHtml}
   ${quizHtml}
   ${answerKeyHtml}
+  ${footerHtml}
 </body>
 </html>`;
 
@@ -187,7 +199,7 @@ async function generateQuizHtml(
 export const POST: RequestHandler = async ({ request, platform }) => {
   try {
     const body: GenerateRequest = await request.json();
-    const { code, lang, mode, count, answers } = body;
+    const { code, lang, mode, count, answers, presenterName, presenterLogo } = body;
 
     if (!code || !lang || !mode) {
       return json({ error: 'Missing required fields: code, lang, mode' }, { status: 400 });
@@ -196,9 +208,9 @@ export const POST: RequestHandler = async ({ request, platform }) => {
     let result: { html: string; title: string };
 
     if (mode === 'course') {
-      result = await generateCourseHtml(code, lang, platform);
+      result = await generateCourseHtml(code, lang, platform, presenterName, presenterLogo);
     } else if (mode === 'quiz') {
-      result = await generateQuizHtml(code, lang, count, answers ?? false, platform);
+      result = await generateQuizHtml(code, lang, count, answers ?? false, platform, presenterName, presenterLogo);
     } else {
       return json({ error: 'Invalid mode. Use "course" or "quiz".' }, { status: 400 });
     }
