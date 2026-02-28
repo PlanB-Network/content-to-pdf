@@ -30,56 +30,126 @@ function authHeaders(platform: App.Platform | undefined): Record<string, string>
 }
 
 /**
- * List all available courses with their languages using the GitHub Tree API.
+ * Fetch the course name (from en.md frontmatter) and metadata (from course.yml) in parallel.
+ */
+async function fetchCourseInfo(
+  code: string
+): Promise<{ name: string; level: string; topic: string }> {
+  const [name, meta] = await Promise.all([
+    // Fetch name from en.md frontmatter
+    (async () => {
+      try {
+        const url = `${RAW_BASE}/courses/${code}/en.md`;
+        const res = await fetch(url);
+        if (!res.ok) return '';
+        const text = await res.text();
+        const match = text.match(/^---\s*\n([\s\S]*?)\n---/);
+        if (!match) return '';
+        const nameMatch = match[1].match(/^name:\s*(.+)$/m);
+        return nameMatch ? nameMatch[1].trim() : '';
+      } catch {
+        return '';
+      }
+    })(),
+    // Fetch level & topic from course.yml
+    (async () => {
+      try {
+        const url = `${RAW_BASE}/courses/${code}/course.yml`;
+        const res = await fetch(url);
+        if (!res.ok) return { level: '', topic: '' };
+        const yml = parseYaml(await res.text()) as Record<string, unknown>;
+        return {
+          level: (yml.level as string) || '',
+          topic: (yml.topic as string) || ''
+        };
+      } catch {
+        return { level: '', topic: '' };
+      }
+    })()
+  ]);
+  return { name, ...meta };
+}
+
+/**
+ * Parse a course code into its prefix (letters) and number for sorting.
+ */
+function parseCourseCode(code: string): { prefix: string; num: number } {
+  const match = code.match(/^([a-zA-Z-]+?)(\d+)$/);
+  if (!match) return { prefix: code, num: 0 };
+  return { prefix: match[1], num: parseInt(match[2], 10) };
+}
+
+/**
+ * List all available course codes with names, sorted by ID type.
+ * Languages are loaded lazily per-course via listCourseLanguages().
  */
 export async function listCourses(platform: App.Platform | undefined): Promise<CourseInfo[]> {
   if (coursesCache && Date.now() - coursesCache.timestamp < CACHE_TTL) {
     return coursesCache.data;
   }
 
-  const url = `https://api.github.com/repos/${BEC_OWNER}/${BEC_REPO}/git/trees/${BEC_BRANCH}?recursive=1`;
-  const res = await fetch(url, { headers: authHeaders(platform) });
+  const headers = authHeaders(platform);
 
-  if (!res.ok) {
-    throw new Error(`GitHub API error: ${res.status} ${res.statusText}`);
-  }
+  // Single API call: list course directories via Contents API
+  const url = `https://api.github.com/repos/${BEC_OWNER}/${BEC_REPO}/contents/courses?ref=${BEC_BRANCH}`;
+  const res = await fetch(url, { headers });
+  if (!res.ok) throw new Error(`GitHub API error: ${res.status} ${res.statusText}`);
 
-  const tree: { tree: { path: string; type: string }[] } = await res.json();
+  const entries: { name: string; type: string }[] = await res.json();
+  const codes = entries.filter((e) => e.type === 'dir').map((e) => e.name);
 
-  const courseMap = new Map<string, Set<string>>();
+  // Fetch names and metadata in parallel for all courses
+  const infos = await Promise.all(codes.map((code) => fetchCourseInfo(code)));
 
-  for (const item of tree.tree) {
-    // Match courses/{code}/course.yml to discover course codes
-    const ymlMatch = item.path.match(/^courses\/([^/]+)\/course\.yml$/);
-    if (ymlMatch) {
-      const code = ymlMatch[1];
-      if (!courseMap.has(code)) courseMap.set(code, new Set());
-    }
+  const courses: CourseInfo[] = codes.map((code, i) => ({
+    code,
+    name: infos[i].name,
+    level: infos[i].level,
+    topic: infos[i].topic,
+    languages: []
+  }));
 
-    // Match courses/{code}/{lang}.md to discover languages
-    const mdMatch = item.path.match(/^courses\/([^/]+)\/([a-z]{2}(?:-[A-Za-z]+)?)\.md$/);
-    if (mdMatch) {
-      const code = mdMatch[1];
-      const lang = mdMatch[2];
-      if (!courseMap.has(code)) courseMap.set(code, new Set());
-      courseMap.get(code)!.add(lang);
-    }
-  }
-
-  const courses: CourseInfo[] = [];
-  for (const [code, langs] of courseMap) {
-    if (langs.size > 0) {
-      courses.push({
-        code,
-        languages: [...langs].sort()
-      });
-    }
-  }
-
-  courses.sort((a, b) => a.code.localeCompare(b.code));
+  // Sort by prefix alphabetically, then by number within each prefix
+  courses.sort((a, b) => {
+    const pa = parseCourseCode(a.code);
+    const pb = parseCourseCode(b.code);
+    if (pa.prefix !== pb.prefix) return pa.prefix.localeCompare(pb.prefix);
+    return pa.num - pb.num;
+  });
 
   coursesCache = { data: courses, timestamp: Date.now() };
   return courses;
+}
+
+// Per-course language cache
+const langCache = new Map<string, { data: string[]; timestamp: number }>();
+
+/**
+ * Fetch available languages for a specific course (1 API call).
+ */
+export async function listCourseLanguages(
+  code: string,
+  platform: App.Platform | undefined
+): Promise<string[]> {
+  const cached = langCache.get(code);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data;
+  }
+
+  const headers = authHeaders(platform);
+  const url = `https://api.github.com/repos/${BEC_OWNER}/${BEC_REPO}/contents/courses/${code}?ref=${BEC_BRANCH}`;
+  const res = await fetch(url, { headers });
+  if (!res.ok) return [];
+
+  const files: { name: string }[] = await res.json();
+  const languages = files
+    .map((f) => f.name.match(/^([a-z]{2}(?:-[A-Za-z]+)?)\.md$/))
+    .filter((m): m is RegExpMatchArray => m !== null)
+    .map((m) => m[1])
+    .sort();
+
+  langCache.set(code, { data: languages, timestamp: Date.now() });
+  return languages;
 }
 
 /**
@@ -130,23 +200,22 @@ export async function fetchQuizQuestions(
   lang: string,
   platform: App.Platform | undefined
 ): Promise<QuizQuestion[]> {
-  // Get the tree for the quizz directory
-  const treeUrl = `https://api.github.com/repos/${BEC_OWNER}/${BEC_REPO}/git/trees/${BEC_BRANCH}?recursive=1`;
-  const res = await fetch(treeUrl, { headers: authHeaders(platform) });
+  // Use Contents API to list quiz directories (lightweight, no recursive tree)
+  const contentsUrl = `https://api.github.com/repos/${BEC_OWNER}/${BEC_REPO}/contents/courses/${code}/quizz?ref=${BEC_BRANCH}`;
+  const res = await fetch(contentsUrl, { headers: authHeaders(platform) });
 
   if (!res.ok) {
+    if (res.status === 404) return []; // No quizz directory
     throw new Error(`GitHub API error: ${res.status}`);
   }
 
-  const tree: { tree: { path: string; type: string }[] } = await res.json();
-  const quizzPrefix = `courses/${code}/quizz/`;
+  const entries: { name: string; type: string }[] = await res.json();
 
   // Find all question directories
   const questionDirs = new Set<string>();
-  for (const item of tree.tree) {
-    if (item.path.startsWith(quizzPrefix) && item.path.endsWith('/question.yml')) {
-      const dir = item.path.replace('/question.yml', '');
-      questionDirs.add(dir);
+  for (const entry of entries) {
+    if (entry.type === 'dir') {
+      questionDirs.add(`courses/${code}/quizz/${entry.name}`);
     }
   }
 

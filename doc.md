@@ -6,7 +6,8 @@
 
 | | |
 |---|---|
-| **Stack** | SvelteKit 2 · Svelte 5 · Tailwind CSS v4 · TypeScript |
+| **Version** | 2.0.0 |
+| **Stack** | SvelteKit 2 · Svelte 5 (runes) · Tailwind CSS v4 · TypeScript |
 | **Runtime** | OpenWorkers (Cloudflare Workers-compatible edge) |
 | **Dev** | Bun / Vite 7 |
 | **Content source** | [bitcoin-educational-content](https://github.com/PlanB-Network/bitcoin-educational-content) (GitHub API) |
@@ -29,7 +30,8 @@
 ┌──────────────▼──────────────────────────────────┐
 │              Server (Edge Worker)                 │
 │                                                  │
-│  GET  /api/courses     → list courses + langs    │
+│  GET  /api/courses     → list courses            │
+│  GET  /api/languages   → languages per course    │
 │  POST /api/generate    → return full HTML doc    │
 │                                                  │
 │  Pipeline:                                       │
@@ -43,10 +45,10 @@
 │              GitHub (External)                    │
 │                                                  │
 │  Raw content:  raw.githubusercontent.com         │
-│  Tree API:     api.github.com/repos/.../git/trees│
+│  Contents API: api.github.com/repos/.../contents │
 │  Repos:                                          │
 │  - PlanB-Network/bitcoin-educational-content     │
-│  - PlanB-Network/bitcoin-learning-management-system │
+│  - PlanB-Network/bitcoin-learning-management-sys │
 └─────────────────────────────────────────────────┘
 ```
 
@@ -66,18 +68,18 @@ content-to-pdf/
 │
 └── src/
     ├── app.html              # HTML shell
-    ├── app.css               # Tailwind entry
+    ├── app.css               # Tailwind v4 entry + custom theme (planb-orange, fonts)
     ├── app.d.ts              # Global types (App.Platform)
     │
     ├── lib/
-    │   ├── types.ts          # Shared types (CourseInfo, GenerateRequest, etc.)
-    │   ├── utils.ts          # formatCourseCode, getLanguageName, escapeHtml
-    │   ├── i18n.ts           # Translation with fallback chain
+    │   ├── types.ts          # Shared types (CourseInfo, GenerateRequest, QuizQuestion, etc.)
+    │   ├── utils.ts          # formatCourseCode, getLanguageName, escapeHtml, getTodayDate
+    │   ├── i18n.ts           # Translation with 3-tier fallback chain
     │   ├── markdown.ts       # Frontmatter extraction, course parsing, markdown→HTML
     │   │
     │   ├── server/
     │   │   ├── env.ts        # Cross-runtime env access (process.env / platform.env)
-    │   │   └── github.ts     # GitHub API client (list courses, fetch content, quiz)
+    │   │   └── github.ts     # GitHub API client (list courses, fetch content, quiz, locales)
     │   │
     │   ├── templates/
     │   │   ├── styles.ts     # Print-optimized CSS (A4, page breaks, PBN branding)
@@ -91,12 +93,13 @@ content-to-pdf/
     │       └── PdfPreview.svelte    # Iframe preview + print button
     │
     └── routes/
-        ├── +layout.svelte          # App shell (Nav + slot)
+        ├── +layout.svelte          # App shell (Nav + slot + footer)
         ├── +page.svelte            # Main page (form + preview)
         ├── +page.server.ts         # Server load: list courses
         └── api/
-            ├── courses/+server.ts  # GET: list available courses
-            └── generate/+server.ts # POST: generate course/quiz HTML
+            ├── courses/+server.ts   # GET: list available courses
+            ├── languages/+server.ts # GET: list languages for a course
+            └── generate/+server.ts  # POST: generate course/quiz HTML
 ```
 
 ---
@@ -136,14 +139,27 @@ Same flow, but instead of markdown parsing:
 
 ### `GET /api/courses`
 
-Returns all available courses with their languages.
+Returns all available courses.
 
 **Response:**
 ```json
 [
-  { "code": "btc101", "languages": ["en", "fr", "es", "de", ...] },
-  { "code": "min201", "languages": ["en", "fr", ...] }
+  { "code": "btc101", "name": "The Bitcoin Journey", "level": "beginner", "topic": "bitcoin", "languages": [] }
 ]
+```
+
+### `GET /api/languages?code={courseCode}`
+
+Returns available languages for a specific course. Languages are loaded lazily per course.
+
+**Query params:**
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `code` | string | yes | Course code (e.g. `btc101`) |
+
+**Response:**
+```json
+["de", "en", "es", "fr", "it", "pt"]
 ```
 
 ### `POST /api/generate`
@@ -176,6 +192,150 @@ Generates a complete printable HTML document.
   "title": "The Bitcoin Journey"
 }
 ```
+
+---
+
+## Type Definitions
+
+```typescript
+// Course listing (languages loaded lazily via /api/languages)
+interface CourseInfo {
+  code: string;        // e.g. "btc101"
+  name: string;        // Course display name
+  level: string;       // beginner | intermediate | advanced | expert
+  topic: string;       // e.g. "bitcoin", "lightning"
+  languages: string[]; // Available language codes (populated lazily)
+}
+
+// API request / response
+interface GenerateRequest {
+  code: string;
+  lang: string;
+  mode: 'course' | 'quiz';
+  count?: number;
+  answers?: boolean;
+}
+interface GenerateResponse {
+  html: string;
+  title: string;
+}
+
+// Quiz structures
+interface QuizQuestion {
+  index: number;
+  chapterId: string;
+  question: string;
+  correctAnswer: string;
+  wrongAnswers: string[];
+  explanation: string;
+  difficulty: string;
+}
+interface ShuffledQuestion {
+  index: number;
+  question: string;
+  choices: { letter: string; text: string }[]; // A, B, C, D
+  correctLetter: string;
+  explanation: string;
+}
+
+// i18n
+type Translations = Record<string, unknown>;
+```
+
+---
+
+## Components (Svelte 5 Runes)
+
+### Nav.svelte
+Sticky header with Plan B logo, app title, and branding.
+
+### GeneratorForm.svelte
+
+**Props:** `courses: CourseInfo[]`, `loading: boolean`, `ongenerate: (params) => void`
+
+**State ($state):**
+- `filterLevel`, `filterTopic` — dropdown filters
+- `selectedCode`, `selectedLang` — current selections
+- `mode` — `'course'` | `'quiz'`
+- `questionCount`, `includeAnswers` — quiz options
+- `availableLanguages`, `loadingLangs` — dynamic language loading
+
+**Derived ($derived):**
+- `levels`, `topics` — unique filter values from courses
+- `filteredCourses` — courses matching selected filters
+
+**Effects ($effect):**
+- When `selectedCode` changes → fetches `/api/languages?code=...` → auto-selects `'en'` or first available
+
+**Form sections:**
+1. Level & topic filter dropdowns
+2. Course selector (shows filtered count)
+3. Language selector (lazy-loaded per course)
+4. Mode toggle (Course PDF / Quiz PDF)
+5. Quiz options (count + answer key checkbox, shown when quiz mode)
+6. Generate button (disabled until course + lang selected)
+
+### PdfPreview.svelte
+
+**Props:** `html: string`, `title: string`
+
+**Behavior:**
+- Renders HTML in an `<iframe>` with white background
+- "Save as PDF" opens a new window with overlay + print dialog
+- Overlay shows spinner, instructions, Plan B branding (screen-only, hidden in print)
+- Waits for images to load, then triggers `window.print()` after 500ms delay
+
+### +page.svelte (Main Page)
+
+**State:** `loading`, `error`, `generatedHtml`, `generatedTitle`
+
+**Flow:** GeneratorForm submit → POST `/api/generate` → PdfPreview renders result
+
+---
+
+## Server-Side Pipeline
+
+### github.ts — GitHub API Client
+
+**Caching:** In-memory with 10-minute TTL for course list and per-course languages.
+
+**Key functions:**
+| Function | Purpose |
+|---|---|
+| `listCourses(platform)` | List all courses from BEC repo, fetch names/levels/topics in parallel |
+| `listCourseLanguages(code, platform)` | List available `.md` files for a course → extract language codes |
+| `fetchCourseMarkdown(code, lang)` | Fetch raw markdown from `courses/{code}/{lang}.md` |
+| `fetchCourseYml(code)` | Fetch course metadata from `courses/{code}/course.yml` |
+| `fetchQuizQuestions(code, lang, platform)` | List `quizz/` subdirectories, fetch question + answers in parallel |
+| `fetchLocaleFile(lang)` | Fetch BLMS translation file (`/locales/{lang}.json`) |
+| `fetchCourseLastCommit(code, lang, platform)` | Get last commit date for a course file |
+| `getImageUrl(code, imgRef, lang)` | Build GitHub raw CDN URL for course images |
+
+**Auth:** Optional `GITHUB_TOKEN` in env → Bearer token → 5000 req/hr (vs 60 unauthenticated).
+
+### markdown.ts — Content Parser
+
+| Function | Purpose |
+|---|---|
+| `extractFrontmatter(raw)` | Custom YAML parser (edge-compatible, replaces gray-matter) |
+| `parseCourseMarkdown(rawContent)` | Extracts frontmatter, splits into parts/chapters, finds review section |
+| `cleanContent(content)` | Strips `<partId>`, `<chapterId>`, UUIDs, stray URLs, excess newlines |
+| `renderMarkdown(md, courseCode, lang)` | markdown-it render + rewrites local image paths to GitHub CDN |
+
+### i18n.ts — Translation System
+
+3-tier fallback: requested locale → English locale → hardcoded defaults.
+
+Covers 25+ keys: `words.course`, `courses.details.curriculum`, `courses.exam.answersReview`, etc.
+
+### templates/ — HTML Generators
+
+| File | Generates |
+|---|---|
+| `styles.ts` | Print-optimized CSS (A4, 25mm top / 20mm side margins, orange accents) |
+| `cover.ts` | Cover page (title, code, lang, date, goal, objectives, quiz count) |
+| `course.ts` | TOC with anchors, course body (parts + chapters), final page with QR code |
+| `quiz.ts` | Shuffled questions (A/B/C/D), answer key with explanations |
 
 ---
 
@@ -236,19 +396,7 @@ The app runs on Cloudflare Workers-compatible edge runtimes with no Node.js APIs
 | `puppeteer` for PDF | Replaced with browser `window.print()` + print CSS |
 | `markdown-it` → `punycode.js` resolution fails in esbuild neutral mode | `scripts/patch-adapter.ts` adds `"module"` field to punycode.js; Vite alias + `ssr.noExternal` |
 | `dotenv` / `commander` | Removed; SvelteKit env + web UI replace CLI |
-| Local filesystem content | GitHub raw URLs + Tree API |
-
----
-
-## i18n (Internationalization)
-
-The `t()` function resolves translations with a 3-tier fallback:
-
-1. **Requested locale** — fetched from BLMS repo (`/locales/{lang}.json`)
-2. **English locale** — fetched from BLMS repo (`/locales/en.json`)
-3. **Hardcoded defaults** — built into `src/lib/i18n.ts`
-
-This ensures PDFs always render even if the BLMS repo is unreachable.
+| Local filesystem content | GitHub raw URLs + Contents API |
 
 ---
 
@@ -264,7 +412,7 @@ All content is fetched at runtime from:
 - **BLMS repo**: `PlanB-Network/bitcoin-learning-management-system` (branch: `main`)
   - Locale files: `apps/academy/public/locales/{lang}.json`
 
-The course list is cached in-memory for 10 minutes to reduce GitHub API calls.
+The course list and per-course languages are cached in-memory for 10 minutes.
 
 ---
 
@@ -272,20 +420,21 @@ The course list is cached in-memory for 10 minutes to reduce GitHub API calls.
 
 | If you want to... | Edit... |
 |---|---|
-| Add a new HTML section to PDFs | `src/lib/templates/course.ts` or `quiz.ts` |
-| Change PDF styling | `src/lib/templates/styles.ts` |
+| Change PDF styling (margins, fonts, colors) | `src/lib/templates/styles.ts` |
 | Modify cover page layout | `src/lib/templates/cover.ts` |
-| Add a new content source | `src/lib/server/github.ts` |
-| Change UI appearance | `src/lib/components/*.svelte` |
+| Add/change HTML sections in course PDFs | `src/lib/templates/course.ts` |
+| Add/change quiz formatting or answer key | `src/lib/templates/quiz.ts` |
+| Change how markdown content is parsed | `src/lib/markdown.ts` |
+| Add a new content source or change GitHub paths | `src/lib/server/github.ts` |
+| Change UI appearance or form behavior | `src/lib/components/*.svelte` |
 | Add new API endpoints | `src/routes/api/` |
-| Add authentication | `src/hooks.server.ts` (create it, see page-to-resources for pattern) |
-| Add a database | `src/lib/server/database.ts` (see page-to-resources for pattern) |
+| Add new languages to the UI language map | `src/lib/utils.ts` → `getLanguageName()` |
+| Add authentication | `src/hooks.server.ts` (create it) |
 | Support new quiz formats | `src/lib/templates/quiz.ts` + `src/lib/server/github.ts` |
-| Add new languages to the UI | `src/lib/utils.ts` → `getLanguageName()` |
 
 ---
 
 ## History
 
 **v1.0.0** — CLI tool using Puppeteer, local filesystem, commander.js
-**v2.0.0** — Web app (SvelteKit + OpenWorkers), GitHub API, browser print
+**v2.0.0** — Web app (SvelteKit + OpenWorkers), GitHub API, browser print, lazy language loading

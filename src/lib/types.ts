@@ -1,5 +1,8 @@
 export interface CourseInfo {
   code: string;
+  name: string;
+  level: string;
+  topic: string;
   languages: string[];
 }
 

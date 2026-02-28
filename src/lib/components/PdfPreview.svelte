@@ -2,9 +2,10 @@
   interface Props {
     html: string;
     title: string;
+    onsaved?: () => void;
   }
 
-  let { html, title }: Props = $props();
+  let { html, title, onsaved }: Props = $props();
 
   function openPrintWindow() {
     const printWindow = window.open('', '_blank');
@@ -100,6 +101,9 @@
     printWindow.onload = () => {
       setTimeout(() => {
         printWindow.print();
+        // Close the tab after the print dialog is dismissed
+        printWindow.close();
+        onsaved?.();
       }, 500);
     };
   }
