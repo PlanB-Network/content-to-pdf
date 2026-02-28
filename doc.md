@@ -6,7 +6,7 @@
 
 | | |
 |---|---|
-| **Version** | 2.0.0 |
+| **Version** | 2.1.0 |
 | **Stack** | SvelteKit 2 · Svelte 5 (runes) · Tailwind CSS v4 · TypeScript |
 | **Runtime** | OpenWorkers (Cloudflare Workers-compatible edge) |
 | **Dev** | Bun / Vite 7 |
@@ -277,10 +277,22 @@ Sticky header with Plan B logo, app title, and branding.
 
 ### PdfPreview.svelte
 
-**Props:** `html: string`, `title: string`
+**Props:** `html: string`, `title: string`, `onsaved?: () => void`
+
+**State ($state):**
+- `viewMode` — `'single'` | `'grid'` (default: `'single'`)
+- `iframeEl` — reference to the preview iframe
+- `pageCount` — number of paginated pages (reported by iframe)
 
 **Behavior:**
-- Renders HTML in an `<iframe>` with white background
+- Injects a pagination script into the iframe that splits content into A4-sized pages
+- Pages are measured and laid out using DOM measurement (794×1123 px per page, 76px horizontal / 38px vertical padding)
+- Respects page break hints: `break-before` on part headers, chapter headers, final page, answer key; `break-after` on cover page, TOC page
+- **Single view**: pages stacked vertically with shadow and page numbers ("N / total")
+- **Grid view**: pages shown as thumbnails (0.3274× scale); clicking a page switches to single view and scrolls to it
+- View mode toggle buttons in the toolbar (single page / grid icons)
+- Page count badge displayed next to the title
+- Communication between parent and iframe via `postMessage` (`pdfPreviewReady`, `setViewMode`, `pdfViewModeChanged`)
 - "Save as PDF" opens a new window with overlay + print dialog
 - Overlay shows spinner, instructions, Plan B branding (screen-only, hidden in print)
 - Waits for images to load, then triggers `window.print()` after 500ms delay
@@ -332,7 +344,7 @@ Covers 25+ keys: `words.course`, `courses.details.curriculum`, `courses.exam.ans
 
 | File | Generates |
 |---|---|
-| `styles.ts` | Print-optimized CSS (A4, 25mm top / 20mm side margins, orange accents) |
+| `styles.ts` | Print-optimized CSS (A4, 20mm @page margins, orange accents) |
 | `cover.ts` | Cover page (title, code, lang, date, goal, objectives, quiz count) |
 | `course.ts` | TOC with anchors, course body (parts + chapters), final page with QR code |
 | `quiz.ts` | Shuffled questions (A/B/C/D), answer key with explanations |
@@ -438,3 +450,4 @@ The course list and per-course languages are cached in-memory for 10 minutes.
 
 **v1.0.0** — CLI tool using Puppeteer, local filesystem, commander.js
 **v2.0.0** — Web app (SvelteKit + OpenWorkers), GitHub API, browser print, lazy language loading
+**v2.1.0** — Paginated PDF preview with single/grid view modes, proper @page margins
