@@ -123,7 +123,7 @@ content-to-pdf/
    - **Table of contents** — numbered list with anchor links
    - **Body** — part headers + chapter headers + rendered markdown content
    - **Final page** — QR code linking to the course review page
-   - **Page footer** — PlanB Academy logo + optional corporate logo + page numbers (on every page)
+   - **Page footer** — PlanB Academy logo + optional corporate logo (centered together) + page numbers (on every page except cover)
 5. Wraps everything in a complete HTML document with print-optimized CSS
 6. Client displays in a paginated iframe preview; "Save as PDF" extracts the paginated HTML and opens browser print dialog
 
@@ -303,7 +303,7 @@ Sticky header with Plan B logo, app title, and branding.
 - Respects page break hints: `break-before` on chapter headers, final page, answer key; `break-after` on cover page, TOC page
 - Part headers are pulled forward to stay with their first chapter when a page break occurs
 - Waits for all images to load before paginating
-- **Page footer**: PlanB Academy logo + optional corporate logo + page number cloned into every page
+- **Page footer**: PlanB Academy logo + optional corporate logo (centered together) + page number cloned into every page except the cover page
 - **Single view**: pages stacked vertically with shadow and page numbers ("N / total")
 - **Grid view**: pages shown as thumbnails (0.3274× scale); clicking a page switches to single view and scrolls to it
 - View mode toggle buttons in the toolbar (single page / grid icons)
@@ -359,7 +359,7 @@ Covers 25+ keys: `words.course`, `courses.details.curriculum`, `courses.exam.ans
 
 | File | Generates |
 |---|---|
-| `styles.ts` | Print-optimized CSS (A4, 15mm top / 20mm side / 25mm bottom margins, orange accents), page footer HTML (PlanB logo + optional corporate logo + page number) |
+| `styles.ts` | Print-optimized CSS (A4, 15mm top / 20mm side / 25mm bottom margins, orange accents), page footer HTML (PlanB logo + optional corporate logo centered together + page number) |
 | `cover.ts` | Cover page (title, code, lang, date, goal, objectives, quiz count, optional instructor section) |
 | `course.ts` | TOC with anchors, course body (parts + chapters), final page with QR code |
 | `quiz.ts` | Shuffled questions (A/B/C/D), answer key with explanations |
@@ -468,3 +468,4 @@ The course list and per-course languages are cached in-memory for 10 minutes.
 **v2.1.0** — Paginated PDF preview with single/grid view modes, proper @page margins
 **v2.2.0** — Page footer (PlanB logo + page numbers), instructor/presenter section on cover, print pipeline uses pre-paginated HTML, tighter typography
 **v2.3.0** — Client-side course name resolution (avoids worker rate-limiting), reduced top margin (15mm), improved print visibility for dividers and footer lines
+**v2.3.1** — Footer logos centered together (removed × separator), no footer on cover page

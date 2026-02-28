@@ -159,22 +159,21 @@
       /* Footer clones inside each preview page */
       .pdf-footer-clone {
         position: absolute;
-        bottom: 30px;
+        bottom: 10px;
         left: 76px;
         right: 76px;
-        display: flex !important;
-        align-items: center;
-        justify-content: space-between;
-        padding-top: 4px;
-        border-top: 1px solid #999;
+        display: block !important;
+        padding-top: 3px;
+        border-top: 1px solid #ccc;
         font-size: 7px;
-        color: #999;
+        color: #aaa;
       }
       .pdf-footer-clone .pdf-footer-logo {
-        height: 8px;
+        height: 10px;
+        width: 54px;
       }
       .pdf-footer-clone .pdf-footer-corporate {
-        height: 10px;
+        height: 12px;
       }
 
       .pdf-page-wrapper {
@@ -369,15 +368,27 @@
           document.body.appendChild(wrapper);
         }
 
-        // Clone footer into each page
+        // Clone footer into each page, tracking chapter per page
         if (footerCloneSource) {
-          var wrappers = document.querySelectorAll('.pdf-page');
-          for (var fi = 0; fi < wrappers.length; fi++) {
+          var allPages = document.querySelectorAll('.pdf-page');
+          var currentChapter = '';
+          for (var fi = 1; fi < allPages.length; fi++) {
+            // Detect chapter from elements on this page
+            var chNums = allPages[fi].querySelectorAll('.chapter-number');
+            if (chNums.length > 0) {
+              currentChapter = chNums[chNums.length - 1].textContent || '';
+            }
             var fClone = footerCloneSource.cloneNode(true);
             fClone.classList.add('pdf-footer-clone');
             var pageSpan = fClone.querySelector('.pdf-footer-page');
             if (pageSpan) pageSpan.textContent = String(fi + 1);
-            wrappers[fi].appendChild(fClone);
+            var totalSpan = fClone.querySelector('.pdf-footer-total');
+            if (totalSpan) totalSpan.textContent = String(allPages.length);
+            var chapterSpan = fClone.querySelector('.pdf-footer-chapter');
+            var sepSpan = fClone.querySelector('.pdf-footer-sep');
+            if (chapterSpan) chapterSpan.textContent = currentChapter;
+            if (!currentChapter && sepSpan) sepSpan.style.display = 'none';
+            allPages[fi].appendChild(fClone);
           }
         }
 

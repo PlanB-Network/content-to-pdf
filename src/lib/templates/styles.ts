@@ -446,30 +446,53 @@ export function getSharedCss(): string {
     .pdf-footer {
       display: none;
     }
-    .pdf-footer-left {
+    .pdf-footer-top {
       display: flex;
-      align-items: center;
-      gap: 6px;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 2px;
+    }
+    .pdf-footer-course {
+      font-size: 7pt;
+      color: #aaa;
+      letter-spacing: 0.3px;
+    }
+    .pdf-footer-right {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+      font-size: 7pt;
+      color: #aaa;
+    }
+    .pdf-footer-chapter {
+      color: #aaa;
+    }
+    .pdf-footer-sep {
+      color: #ccc;
+    }
+    .pdf-footer-page {
+      color: #999;
+      font-weight: 600;
+    }
+    .pdf-footer-logos {
+      text-align: center;
     }
     .pdf-footer-logo {
-      height: 10px;
-      width: auto;
+      display: inline-block;
+      vertical-align: middle;
+      height: 12px;
+      width: 65px;
       opacity: 0.5;
     }
     .pdf-footer-corporate {
-      height: 14px;
+      display: inline-block;
+      vertical-align: middle;
+      height: 16px;
       width: auto;
       max-width: 80px;
       object-fit: contain;
       opacity: 0.6;
-    }
-    .pdf-footer-x {
-      font-size: 7pt;
-      color: #bbb;
-    }
-    .pdf-footer-page {
-      font-size: 7.5pt;
-      color: #999;
+      margin-left: 6px;
     }
 
     /* ============ Print (paginated output) ============ */
@@ -482,18 +505,13 @@ export function getSharedCss(): string {
          In paginated mode, the script removes .pdf-footer from the DOM
          so this rule is inert; the .pdf-footer-clone rules below apply instead. */
       .pdf-footer {
-        display: flex !important;
+        display: block !important;
         position: fixed;
         bottom: 0;
         left: 0;
         right: 0;
-        align-items: center;
-        justify-content: space-between;
-        padding-top: 1.5mm;
-        border-top: 1pt solid #999;
-      }
-      .pdf-footer-page::after {
-        content: counter(page);
+        padding-top: 1mm;
+        border-top: 1pt solid #ccc;
       }
       /* Each wrapper = one printed page */
       .pdf-page-wrapper { page-break-after: always; break-after: page; }
@@ -509,36 +527,45 @@ export function getSharedCss(): string {
       .pdf-page .answer-key { page-break-before: auto; }
       /* Footer clones */
       .pdf-footer-clone {
-        display: flex !important;
+        display: block !important;
         position: absolute;
-        bottom: 8mm;
+        bottom: 3mm;
         left: 20mm;
         right: 20mm;
-        align-items: center;
-        justify-content: space-between;
-        padding-top: 1.5mm;
-        border-top: 1pt solid #999;
+        padding-top: 1mm;
+        border-top: 1pt solid #ccc;
         font-size: 7pt;
-        color: #999;
+        color: #aaa;
       }
-      .pdf-footer-clone .pdf-footer-logo { height: 8px; }
-      .pdf-footer-clone .pdf-footer-corporate { height: 10px; }
+      .pdf-footer-clone .pdf-footer-logo { height: 10px; width: 54px; }
+      .pdf-footer-clone .pdf-footer-corporate { height: 12px; }
     }
   `;
 }
 
-export function generateFooterHtml(presenterLogo?: string): string {
+export function generateFooterHtml(
+  courseCode: string,
+  courseName: string,
+  presenterLogo?: string
+): string {
   const corporatePart = presenterLogo
-    ? `<span class="pdf-footer-x">\u00D7</span><img class="pdf-footer-corporate" src="${presenterLogo}" alt="" />`
+    ? `<img class="pdf-footer-corporate" src="${presenterLogo}" alt="" />`
     : '';
 
   return `
     <div class="pdf-footer">
-      <div class="pdf-footer-left">
+      <div class="pdf-footer-top">
+        <div class="pdf-footer-course">${courseCode} — ${courseName}</div>
+        <div class="pdf-footer-right">
+          <span class="pdf-footer-chapter"></span>
+          <span class="pdf-footer-sep">|</span>
+          <span class="pdf-footer-page"></span>/<span class="pdf-footer-total"></span>
+        </div>
+      </div>
+      <div class="pdf-footer-logos">
         ${PLANB_LOGO_SVG}
         ${corporatePart}
       </div>
-      <div class="pdf-footer-page"></div>
     </div>
   `;
 }

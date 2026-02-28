@@ -20,7 +20,7 @@ import {
   generateAnswerKeyHtml
 } from '$lib/templates/quiz.js';
 import { getSharedCss, generateFooterHtml } from '$lib/templates/styles.js';
-import { escapeHtml } from '$lib/utils.js';
+import { escapeHtml, formatCourseCode } from '$lib/utils.js';
 
 async function loadLocales(lang: string): Promise<{
   locale: Translations | null;
@@ -85,7 +85,7 @@ async function generateCourseHtml(
   );
 
   const title = parsed.frontmatter.name || code.toUpperCase();
-  const footerHtml = generateFooterHtml(presenterLogo);
+  const footerHtml = generateFooterHtml(formatCourseCode(code), escapeHtml(title), presenterLogo);
 
   const html = `<!DOCTYPE html>
 <html lang="${lang}">
@@ -176,7 +176,7 @@ async function generateQuizHtml(
   }
 
   const title = `${courseName} - Quiz`;
-  const footerHtml = generateFooterHtml(presenterLogo);
+  const footerHtml = generateFooterHtml(formatCourseCode(code), escapeHtml(courseName), presenterLogo);
 
   const html = `<!DOCTYPE html>
 <html lang="${lang}">
