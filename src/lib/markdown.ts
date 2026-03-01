@@ -176,10 +176,22 @@ export function parseCourseMarkdown(rawContent: string, fullMode = false): Parse
         j + 1 < chapterMatches.length ? chapterMatches[j + 1].index! : partContent.length;
       const chapterContent = partContent.substring(chStart, chEnd).trim();
 
+      // Skip special sections (exam, review, conclusion) using language-independent XML tags
+      if (
+        /<isCourseReview>true<\/isCourseReview>/.test(chapterContent) ||
+        /<isCourseExam>/.test(chapterContent) ||
+        /<isCourseConclusion>/.test(chapterContent)
+      ) {
+        continue;
+      }
+
+      const cleaned = cleanContent(chapterContent, fullMode);
+      if (!cleaned) continue; // Skip chapters with no content after cleaning
+
       chapters.push({
         title: chapterTitle,
         chapterId,
-        content: cleanContent(chapterContent, fullMode)
+        content: cleaned
       });
     }
 

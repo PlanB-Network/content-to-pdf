@@ -18,7 +18,7 @@
     <div class="mx-auto flex max-w-4xl items-center justify-between text-sm text-zinc-500">
       <div class="flex items-center gap-4">
         <a
-          href="https://github.com/PlanB-Network/bitcoin-educational-content"
+          href="https://github.com/PlanB-Network/content-to-pdf"
           target="_blank"
           rel="noopener noreferrer"
           class="inline-flex items-center gap-1 transition-colors hover:text-zinc-300"
@@ -29,12 +29,12 @@
           </svg>
         </a>
         <a
-          href="https://planb.network"
+          href="https://planb.academy"
           target="_blank"
           rel="noopener noreferrer"
           class="inline-flex items-center gap-1 transition-colors hover:text-zinc-300"
         >
-          Website
+          Learn
           <svg class="h-3 w-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
           </svg>
