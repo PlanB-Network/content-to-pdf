@@ -1,100 +1,80 @@
 # Content to PDF
 
-TypeScript CLI tool that generates print-ready PDFs from [Bitcoin Educational Content](https://github.com/PlanB-Network/bitcoin-educational-content) courses and quizzes.
+Generate print-ready PDFs from [Plan B Network](https://planb.network) courses and quizzes — directly in the browser.
 
-Supports **48+ courses** across **30+ languages** with platform-matching layout, i18n labels from [BLMS](https://github.com/PlanB-Network/bitcoin-learning-management-system) locales, and embedded images.
+**Live:** [content-to-pdf.workers.rocks](https://content-to-pdf.workers.rocks)
 
 ## Features
 
-- **Course PDFs** — Cover page, table of contents, full chapter content with embedded images, final page with QR code linking to the course review
-- **Quiz PDFs** — Shuffled multiple-choice questions (A/B/C/D) with optional answer key and explanations
-- **Multi-language** — Uses BLMS locale translations with fallback chain (requested lang -> en -> hardcoded)
-- **Platform-matching design** — Plan B Network orange accent, proper typography, print-optimized layout
-- **Persistent footer** — Version hash + date on every page with PBN logo
+- **Course** — Text and images only, clean print layout
+- **Full Course** — Tutorials, resources, and QR codes linking to external content
+- **Quiz** — Randomized multiple-choice questions with answer key
+- **Teacher Guide** — Ready to Teach companion (BETA)
+- **48+ courses** across **30+ languages**
+- Cover page, table of contents, page numbers, and final page with credits
+- No Puppeteer — uses browser `window.print()` with print-optimized CSS
 
-## Prerequisites
+## Stack
 
-- Node.js >= 18
-- Local clone of [bitcoin-educational-content](https://github.com/PlanB-Network/bitcoin-educational-content)
-- Local clone of [bitcoin-learning-management-system](https://github.com/PlanB-Network/bitcoin-learning-management-system) (for i18n labels)
+- [SvelteKit 2](https://svelte.dev/) + [Svelte 5](https://svelte.dev/docs/svelte/overview) (runes)
+- [Tailwind CSS v4](https://tailwindcss.com/)
+- TypeScript
+- Deployed on [OpenWorkers](https://openworkers.com/) (Cloudflare Workers edge)
 
-## Setup
+## How It Works
+
+All content is fetched at runtime from GitHub — no local repos needed:
+
+- **Courses & quizzes** from [bitcoin-educational-content](https://github.com/PlanB-Network/bitcoin-educational-content) (`dev` branch)
+- **i18n labels** from [bitcoin-learning-management-system](https://github.com/PlanB-Network/bitcoin-learning-management-system) (`main` branch)
+- **Tutorial metadata** from the [Plan B Network API](https://planb.network)
+
+Select a course, language, and PDF type in the UI, preview the result, then print/save as PDF.
+
+## Development
 
 ```bash
 git clone https://github.com/PlanB-Network/content-to-pdf.git
 cd content-to-pdf
 npm install
+npm run dev
 ```
 
-Create a `.env` file from the example:
+Open [localhost:5173](http://localhost:5173).
+
+## Deploy
 
 ```bash
-cp .env.example .env
+# Production
+npm run deploy
+
+# Staging
+npm run deploy:dev
 ```
-
-Edit `.env` to point to your local repos:
-
-```env
-BEC_PATH=../bitcoin-educational-content
-BLMS_LOCALES_PATH=../bitcoin-learning-management-system/apps/academy/public/locales
-```
-
-## Usage
-
-### Course PDF
-
-```bash
-# English
-npx tsx src/cli.ts course --code btc101 --lang en
-
-# French
-npx tsx src/cli.ts course --code btc101 --lang fr
-```
-
-### Quiz PDF
-
-```bash
-# Full quiz with answer key
-npx tsx src/cli.ts quiz --code btc101 --lang en --answers
-
-# Random 20-question exam (no answers)
-npx tsx src/cli.ts quiz --code btc101 --lang en --count 20
-
-# Random 20-question exam with answer key
-npx tsx src/cli.ts quiz --code btc101 --lang en --count 20 --answers
-```
-
-### Options
-
-| Option | Description | Required |
-|--------|-------------|----------|
-| `--code <code>` | Course code (e.g. `btc101`, `min201`) | Yes |
-| `--lang <lang>` | Language code (e.g. `en`, `fr`, `es`) | Yes |
-| `--count <n>` | Number of random questions (quiz only) | No |
-| `--answers` | Include answer key (quiz only) | No |
-| `--output <path>` | Custom output directory | No |
-| `--bec-path <path>` | Override BEC repo path | No |
-| `--blms-path <path>` | Override BLMS locales path | No |
-
-Output PDFs are saved to `output/` by default.
 
 ## Project Structure
 
 ```
 src/
-├── cli.ts              # CLI entry point (commander)
-├── config.ts           # Path resolution from .env / CLI args
-├── course.ts           # Course PDF pipeline
-├── quiz.ts             # Quiz PDF pipeline
-├── markdown.ts         # Markdown parsing + content cleaning
-├── pdf.ts              # HTML-to-PDF via Puppeteer
-├── i18n.ts             # BLMS locale loading with fallback
-├── utils.ts            # Image embedding, git hash, helpers
-└── templates/
-    ├── cover.ts        # Cover page HTML
-    ├── course.ts       # TOC, course body, final page HTML
-    ├── quiz.ts         # Quiz body + answer key HTML
-    └── styles.ts       # Shared CSS (platform-matching)
+├── lib/
+│   ├── components/       # Svelte UI components
+│   ├── server/
+│   │   └── github.ts     # GitHub content fetching + caching
+│   ├── templates/
+│   │   ├── cover.ts      # Cover page HTML
+│   │   ├── course.ts     # TOC, course body, final page
+│   │   ├── quiz.ts       # Quiz body + answer key
+│   │   └── styles.ts     # Print CSS + page footer
+│   ├── markdown.ts       # Markdown parsing + resource cards
+│   ├── types.ts          # TypeScript types
+│   └── i18n.ts           # Locale loading with fallback
+└── routes/
+    ├── +page.svelte      # Main UI
+    ├── best-practices/   # Print best practices page
+    └── api/
+        ├── courses/      # GET — list all courses
+        ├── languages/    # GET — languages for a course
+        └── generate/     # POST — generate HTML document
 ```
 
 ## License
