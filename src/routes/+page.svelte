@@ -62,6 +62,9 @@
   <!-- Generator form -->
   <div class="rounded-xl border border-zinc-700 bg-zinc-900 p-6">
     <h2 class="mb-4 text-lg font-bold text-zinc-100">Pick a course and teach it locally</h2>
+    <p class="mb-4 text-sm text-zinc-400">
+      Please read the <a href="/best-practices" target="_blank" class="font-medium text-planb-orange underline hover:text-[#e65200]">best practices</a> to ensure you get the maximum outcome.
+    </p>
     <GeneratorForm
       courses={data.courses}
       {loading}
