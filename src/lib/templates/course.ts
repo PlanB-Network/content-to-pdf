@@ -2,7 +2,7 @@ import type { Part } from '../markdown.js';
 import { renderMarkdown } from '../markdown.js';
 import { t } from '../i18n.js';
 import { escapeHtml } from '../utils.js';
-import type { CourseCredits, Translations } from '../types.js';
+import type { CourseCredits, TutorialMeta, CourseMeta, Translations } from '../types.js';
 import { PLANB_LOGO_SVG } from './styles.js';
 
 export function generateTocHtml(
@@ -36,7 +36,10 @@ export function generateCourseBodyHtml(
   courseCode: string,
   lang: string,
   locale: Translations | null,
-  enLocale: Translations | null
+  enLocale: Translations | null,
+  fullMode = false,
+  tutorialMetaMap?: Map<string, TutorialMeta>,
+  courseMetaMap?: Map<string, CourseMeta>
 ): string {
   let html = '';
 
@@ -63,7 +66,7 @@ export function generateCourseBodyHtml(
         </div>
       `;
 
-      html += renderMarkdown(ch.content, courseCode, lang) + '\n';
+      html += renderMarkdown(ch.content, courseCode, lang, fullMode, tutorialMetaMap, courseMetaMap) + '\n';
     }
   }
 
@@ -140,8 +143,8 @@ export function generateFinalPageHtml(
           <p>${escapeHtml(t(locale, enLocale, 'courses.final.leaveReview'))}</p>
         </div>
         <div class="final-review-qr">
-          <img src="${qrApiUrl}" alt="QR Code" width="150" height="150">
-          <p class="final-url">${escapeHtml(reviewUrl)}</p>
+          <a href="${escapeHtml(reviewUrl)}"><img src="${qrApiUrl}" alt="QR Code" width="150" height="150"></a>
+          <a class="resource-card-url" href="${escapeHtml(reviewUrl)}">See more →</a>
         </div>
       </div>
 
@@ -157,7 +160,6 @@ export function generateFinalPageHtml(
         </div>
         <div class="final-contribute-qr">
           <img src="${discordQrUrl}" alt="Discord QR" width="80" height="80">
-          <p class="final-url">${escapeHtml(discordUrl)}</p>
         </div>
       </div>
 

@@ -6,7 +6,7 @@
 
 | | |
 |---|---|
-| **Version** | 2.4.0 |
+| **Version** | 2.7.0 |
 | **Stack** | SvelteKit 2 · Svelte 5 (runes) · Tailwind CSS v4 · TypeScript |
 | **Runtime** | OpenWorkers (Cloudflare Workers-compatible edge) |
 | **Dev** | Bun / Vite 7 |
@@ -51,6 +51,15 @@
 │  Repos:                                          │
 │  - PlanB-Network/bitcoin-educational-content     │
 │  - PlanB-Network/bitcoin-learning-management-sys │
+└─────────────────────────────────────────────────┘
+               │
+┌──────────────▼──────────────────────────────────┐
+│              PlanB API (External)                 │
+│                                                  │
+│  tRPC API: planb.network/api/trpc/               │
+│  CDN:      planb.network/cdn/                    │
+│  Used for: tutorial metadata (name, description, │
+│            builder logo) in full course mode      │
 └─────────────────────────────────────────────────┘
 ```
 
@@ -108,6 +117,17 @@ content-to-pdf/
 
 ## How It Works
 
+### PDF Types
+
+The UI presents four PDF types as selectable cards:
+
+| Type | Description | Status |
+|------|-------------|--------|
+| **Course** | Simplified — text + images only (strips URLs, YouTube, tutorials) | Active |
+| **Full Course** | Complete — keeps videos, tutorials, resources as styled cards with QR codes | Active |
+| **Quiz** | Randomized questions with answers always attached at the end | Active |
+| **Ready to Teach** | Teacher guide with objectives, tips, discussions | BETA (BTC 101 only) |
+
 ### Course PDF Generation
 
 1. User selects a course code (e.g. `btc101`) and language (e.g. `en`)
@@ -118,7 +138,7 @@ content-to-pdf/
 3. Parses the markdown:
    - Extracts YAML frontmatter (name, goal, objectives)
    - Splits into parts (`# Title` + `<partId>`) and chapters (`## Title` + `<chapterId>`)
-   - Cleans metadata tags, UUIDs, stray lines
+   - Cleans metadata tags, UUIDs, stray lines; strips standalone URLs and YouTube embeds
 4. Generates HTML sections:
    - **Cover page** — title, code, language, date, goal, objectives; optional instructor name/logo
    - **Table of contents** — numbered list with anchor links
@@ -128,13 +148,41 @@ content-to-pdf/
 5. Wraps everything in a complete HTML document with print-optimized CSS
 6. Client displays in a paginated iframe preview; "Save as PDF" extracts the paginated HTML and opens browser print dialog
 
+### Full Course PDF Generation
+
+Same pipeline as Course, but with `fullMode=true`:
+- **Does not strip** standalone URLs, YouTube embeds, or tutorial links
+- Converts them into **resource cards** — styled bordered boxes containing:
+  - Type label (VIDEO, TUTORIAL, COURSE, RESOURCE, LINK)
+  - Title (prettified from URL slug or alt text)
+  - YouTube thumbnail (for video cards)
+  - Clickable QR code linking to the resource URL
+  - Short action link below QR ("See tutorial →", "Watch video →", "See more →")
+
+**Enriched tutorial cards:** Tutorial URLs (`planb.academy/tutorials/...`) are rendered as enhanced cards with metadata fetched from the PlanB tRPC API (`content.getTutorials`):
+  - Builder/company logo (from PlanB CDN: `planb.network/cdn/{logoUrl}/assets/logo.webp`)
+  - Tutorial title (localized)
+  - Tutorial description (localized)
+  - QR code + "See tutorial →" link on the right
+  - Falls back to a generic resource card if the tutorial is not found in the API
+
 ### Quiz PDF Generation
 
 Same flow, but instead of markdown parsing:
 1. Fetches quiz questions from `courses/{code}/quizz/*/question.yml` + `{lang}.yml`
 2. Optionally limits to N random questions (Fisher-Yates shuffle)
 3. Shuffles answer choices (A/B/C/D) for each question
-4. Generates quiz body + optional answer key with explanations
+4. Generates quiz body + answer key with explanations (always attached)
+
+### Ready to Teach (Teacher Guide) PDF Generation
+
+Currently available for **BTC 101 only** (BETA). The card is disabled in the UI when any other course is selected, with a message "Only available for BTC 101".
+
+1. Fetches the teacher guide markdown from `static/ready-to-teach/{code}-{lang}.md`
+2. Parses with `parseTeacherGuideMarkdown()` — same part/chapter structure as courses but uses plain `# Part` / `## Chapter` headings
+3. Also fetches the original course markdown + `course.yml` for cover page metadata (goal, objectives, level)
+4. Renders task list checkboxes (`- [ ]`) as styled HTML checkboxes (no bullet points)
+5. Includes "Teacher's Notes" sections — lined boxes (360px min-height) for handwritten notes
 
 ---
 
@@ -176,9 +224,8 @@ Generates a complete printable HTML document.
 {
   "code": "btc101",
   "lang": "en",
-  "mode": "course",
+  "type": "course",
   "count": 20,
-  "answers": true,
   "presenterName": "Alice",
   "presenterLogo": "data:image/png;base64,..."
 }
@@ -188,9 +235,8 @@ Generates a complete printable HTML document.
 |-------|------|----------|-------------|
 | `code` | string | yes | Course code (e.g. `btc101`) |
 | `lang` | string | yes | Language code (e.g. `en`, `fr`) |
-| `mode` | `"course"` \| `"quiz"` | yes | Generation mode |
+| `type` | `"course"` \| `"course-full"` \| `"quiz"` \| `"teacher-guide"` | yes | PDF type |
 | `count` | number | no | Limit quiz to N random questions |
-| `answers` | boolean | no | Include answer key (quiz only) |
 | `presenterName` | string | no | Instructor name shown on cover page |
 | `presenterLogo` | string | no | Instructor logo URL/data-URI (cover + page footer) |
 
@@ -216,13 +262,15 @@ interface CourseInfo {
   languages: string[]; // Available language codes (populated lazily)
 }
 
+// PDF type selector
+type PdfType = 'course' | 'course-full' | 'quiz' | 'teacher-guide';
+
 // API request / response
 interface GenerateRequest {
   code: string;
   lang: string;
-  mode: 'course' | 'quiz';
+  type: PdfType;
   count?: number;
-  answers?: boolean;
   presenterName?: string;
   presenterLogo?: string;
 }
@@ -237,6 +285,13 @@ interface CourseCredits {
   contributors: string[];
   proofreaders: string[];
   originalLanguage: string;
+}
+
+// Tutorial metadata for enriched cards (full course mode)
+interface TutorialMeta {
+  name: string;           // Localized tutorial title
+  description: string;    // Localized tutorial description
+  logoUrl: string | null;  // Builder/company logo from PlanB CDN
 }
 
 // Quiz structures
@@ -275,8 +330,8 @@ Sticky header with PlanB pill logo, app title ("Courses PDF Generator"), and "En
 **State ($state):**
 - `filterLevel`, `filterTopic` — dropdown filters
 - `selectedCode`, `selectedLang` — current selections
-- `mode` — `'course'` | `'quiz'`
-- `questionCount`, `includeAnswers` — quiz options
+- `selectedType` — `PdfType` (card picker selection)
+- `questionCount` — quiz question limit
 - `presenterName`, `presenterLogo` — optional instructor info
 - `availableLanguages`, `loadingLangs` — dynamic language loading
 
@@ -292,8 +347,8 @@ Sticky header with PlanB pill logo, app title ("Courses PDF Generator"), and "En
 1. Level & topic filter dropdowns
 2. Course selector (shows filtered count)
 3. Language selector (lazy-loaded per course)
-4. Mode toggle (Course PDF / Quiz PDF)
-5. Quiz options (count + answer key checkbox, shown when quiz mode)
+4. PDF type card picker (2×2 grid: Course, Quiz, Ready to Teach [BETA, BTC 101 only], Full Course)
+5. Quiz options (question count, shown when Quiz is selected)
 6. Instructor section (optional name + logo file upload with data-URI preview)
 7. Generate button (disabled until course + lang selected)
 
@@ -347,6 +402,7 @@ Sticky header with PlanB pill logo, app title ("Courses PDF Generator"), and "En
 | `fetchProfessorNames(ids, platform)` | Resolve professor UUIDs to display names via GitHub GraphQL API (cached 10 min) |
 | `fetchCourseLastCommit(code, lang, platform)` | Get last commit date for a course file |
 | `getImageUrl(code, imgRef, lang)` | Build GitHub raw CDN URL for course images |
+| `fetchTutorialsMeta(urls, lang)` | Match tutorial URLs to PlanB tRPC API data → `Map<url, TutorialMeta>` (cached 10 min) |
 
 **Auth:** Optional `GITHUB_TOKEN` in env → Bearer token → 5000 req/hr (vs 60 unauthenticated).
 
@@ -355,9 +411,14 @@ Sticky header with PlanB pill logo, app title ("Courses PDF Generator"), and "En
 | Function | Purpose |
 |---|---|
 | `extractFrontmatter(raw)` | Custom YAML parser (edge-compatible, replaces gray-matter) |
-| `parseCourseMarkdown(rawContent)` | Extracts frontmatter, splits into parts/chapters, finds review section |
-| `cleanContent(content)` | Strips `<partId>`, `<chapterId>`, UUIDs, stray URLs, excess newlines |
-| `renderMarkdown(md, courseCode, lang)` | markdown-it render + rewrites local image paths to GitHub CDN |
+| `parseCourseMarkdown(rawContent, fullMode?)` | Extracts frontmatter, splits into parts/chapters, finds review section; `fullMode` preserves URLs |
+| `parseTeacherGuideMarkdown(rawContent)` | Parses teacher guide markdown with plain `# Part` / `## Chapter` headings (no `<partId>`/`<chapterId>` tags) |
+| `cleanContent(content, fullMode?)` | Strips `<partId>`, `<chapterId>`, UUIDs, excess newlines; strips URLs/YouTube only when `fullMode=false` |
+| `renderMarkdown(md, courseCode, lang, fullMode?, tutorialMetaMap?)` | markdown-it render + rewrites local image paths; converts `- [ ]`/`- [x]` task lists to styled checkboxes; `fullMode` converts URLs to resource cards; enriches tutorials when metadata available |
+| `extractTutorialUrls(content)` | Scans markdown for `planb.academy/tutorials/...` URLs, returns unique list |
+| `renderResourceCard(url, altText?, tutorialMetaMap?)` | Generates styled resource card HTML; delegates to enriched tutorial card when metadata is available |
+| `renderTutorialCard(url, meta)` | Generates enriched tutorial card with builder logo, title, description, QR code |
+| `prettifyPlanbUrl(url)` | Extracts readable label and type (tutorial/course/resource) from PlanB URLs |
 
 ### i18n.ts — Translation System
 
@@ -369,7 +430,7 @@ Covers 40+ keys: `words.course`, `courses.details.curriculum`, `courses.exam.ans
 
 | File | Generates |
 |---|---|
-| `styles.ts` | Print-optimized CSS (A4, 15mm top / 20mm side / 25mm bottom margins, orange accents), page footer HTML (PlanB logo + optional corporate logo centered together + page number) |
+| `styles.ts` | Print-optimized CSS (A4, 15mm top / 20mm side / 25mm bottom margins, orange accents), resource card styles, page footer HTML |
 | `cover.ts` | Cover page (title, code, lang, date, goal, objectives, quiz count, optional instructor section) |
 | `course.ts` | TOC with anchors, course body (parts + chapters), final page (credits, review QR, Discord QR, CTAs) |
 | `quiz.ts` | Shuffled questions (A/B/C/D), answer key with explanations |
@@ -449,7 +510,11 @@ All content is fetched at runtime from:
 - **BLMS repo**: `PlanB-Network/bitcoin-learning-management-system` (branch: `main`)
   - Locale files: `apps/academy/public/locales/{lang}.json`
 
-The course list and per-course languages are cached in-memory for 10 minutes.
+- **PlanB tRPC API**: `planb.network/api/trpc/`
+  - Tutorial list: `content.getTutorials` → title, description, logoUrl, path
+  - Logo CDN: `planb.network/cdn/{logoUrl}/assets/logo.webp`
+
+The course list, per-course languages, and tutorial list are cached in-memory for 10 minutes.
 
 ---
 
@@ -462,7 +527,8 @@ The course list and per-course languages are cached in-memory for 10 minutes.
 | Add/change HTML sections in course PDFs | `src/lib/templates/course.ts` |
 | Add/change quiz formatting or answer key | `src/lib/templates/quiz.ts` |
 | Change how markdown content is parsed | `src/lib/markdown.ts` |
-| Add a new content source or change GitHub paths | `src/lib/server/github.ts` |
+| Change tutorial card layout or enrichment | `src/lib/markdown.ts` → `renderTutorialCard()` |
+| Add a new content source or change GitHub/API paths | `src/lib/server/github.ts` |
 | Change UI appearance or form behavior | `src/lib/components/*.svelte` |
 | Add new API endpoints | `src/routes/api/` |
 | Add new languages to the UI language map | `src/lib/utils.ts` → `getLanguageName()` |
@@ -480,3 +546,6 @@ The course list and per-course languages are cached in-memory for 10 minutes.
 **v2.3.0** — Client-side course name resolution (avoids worker rate-limiting), reduced top margin (15mm), improved print visibility for dividers and footer lines
 **v2.3.1** — Footer logos centered together (removed × separator), no footer on cover page
 **v2.4.0** — Redesigned final page with credits (teacher, contributors, proofreaders via GraphQL), review QR, Discord contribute QR, GitHub source link, CTAs; PlanB pill logo in Nav/print; UI text refresh
+**v2.5.0** — Card-based PDF type picker (Course, Quiz, Ready to Teach, Full Course); Full Course mode with resource cards (YouTube thumbnails, QR codes, clickable links); quiz answers always attached; `mode`→`type` API rename
+**v2.6.0** — Enriched tutorial cards in full course mode: fetches metadata from PlanB tRPC API (title, description, builder logo via CDN); clickable QR codes; short action links ("See tutorial →", "Watch video →") replace truncated URLs on all resource cards
+**v2.7.0** — Ready to Teach (BETA): teacher guide PDF for BTC 101 with task-list checkboxes and teacher notes; card is disabled for other courses with explanatory message; markdown task lists (`- [ ]`/`- [x]`) now render as styled checkboxes across all PDF types

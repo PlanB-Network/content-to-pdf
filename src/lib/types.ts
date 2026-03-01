@@ -6,12 +6,13 @@ export interface CourseInfo {
   languages: string[];
 }
 
+export type PdfType = 'course' | 'course-full' | 'quiz' | 'teacher-guide';
+
 export interface GenerateRequest {
   code: string;
   lang: string;
-  mode: 'course' | 'quiz';
+  type: PdfType;
   count?: number;
-  answers?: boolean;
   presenterName?: string;
   presenterLogo?: string;
 }
@@ -44,6 +45,19 @@ export interface CourseCredits {
   contributors: string[];
   proofreaders: string[];
   originalLanguage: string;
+}
+
+export interface TutorialMeta {
+  name: string;
+  description: string;
+  logoUrl: string | null;
+}
+
+export interface CourseMeta {
+  code: string;
+  name: string;
+  goal: string;
+  thumbnailUrl: string;
 }
 
 export type Translations = Record<string, unknown>;

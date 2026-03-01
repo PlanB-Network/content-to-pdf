@@ -1,6 +1,6 @@
 import { parse as parseYaml } from 'yaml';
 import { getEnv } from './env.js';
-import type { CourseInfo, QuizQuestion } from '../types.js';
+import type { CourseInfo, QuizQuestion, TutorialMeta, CourseMeta } from '../types.js';
 
 const BEC_OWNER = 'PlanB-Network';
 const BEC_REPO = 'bitcoin-educational-content';
@@ -407,4 +407,190 @@ export async function fetchLocaleFile(lang: string): Promise<Record<string, unkn
   } catch {
     return null;
   }
+}
+
+// ─── Tutorial metadata (PlanB tRPC API) ────────────────────────────
+
+const PLANB_CDN = 'https://planb.network/cdn';
+
+interface TutorialListItem {
+  name: string;
+  title: string;
+  description: string;
+  logoUrl: string;
+  path: string;
+}
+
+// Tutorials cache per language
+const tutorialsCache = new Map<string, { data: TutorialListItem[]; timestamp: number }>();
+
+async function fetchTutorialsList(lang: string): Promise<TutorialListItem[]> {
+  const cached = tutorialsCache.get(lang);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data;
+  }
+
+  const input = encodeURIComponent(
+    JSON.stringify({ json: { language: lang, notArchivedOnly: true } })
+  );
+  const url = `https://planb.network/api/trpc/content.getTutorials?input=${input}`;
+
+  try {
+    const res = await fetch(url, { headers: { 'User-Agent': 'content-to-pdf' } });
+    if (!res.ok) return [];
+
+    const body = await res.json();
+    const items = body?.result?.data?.json;
+    if (!Array.isArray(items)) return [];
+
+    const tutorials: TutorialListItem[] = items.map(
+      (t: Record<string, unknown>) => ({
+        name: t.name as string,
+        title: (t.title as string) || '',
+        description: (t.description as string) || '',
+        logoUrl: (t.logoUrl as string) || '',
+        path: (t.path as string) || ''
+      })
+    );
+
+    tutorialsCache.set(lang, { data: tutorials, timestamp: Date.now() });
+    return tutorials;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Given a list of tutorial URLs found in markdown, fetch metadata from the
+ * PlanB tRPC API and return a Map<url, TutorialMeta>.
+ */
+export async function fetchTutorialsMeta(
+  urls: string[],
+  lang: string
+): Promise<Map<string, TutorialMeta>> {
+  if (urls.length === 0) return new Map();
+
+  const tutorials = await fetchTutorialsList(lang);
+  const result = new Map<string, TutorialMeta>();
+
+  // Build lookup by path (e.g. "tutorials/node/bitcoin-core-linux")
+  const byPath = new Map<string, TutorialListItem>();
+  for (const t of tutorials) {
+    byPath.set(t.path, t);
+  }
+
+  for (const rawUrl of urls) {
+    const m = rawUrl.match(
+      /planb\.academy\/tutorials\/([^/]+)\/(?:[^/]+\/)?([^?#]+)/
+    );
+    if (!m) continue;
+
+    const category = m[1];
+    const slug = m[2].replace(
+      /-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/,
+      ''
+    );
+    const path = `tutorials/${category}/${slug}`;
+    const tutorial = byPath.get(path);
+    if (!tutorial) continue;
+
+    const logoUrl = tutorial.logoUrl
+      ? `${PLANB_CDN}/${tutorial.logoUrl}/assets/logo.webp`
+      : null;
+
+    result.set(rawUrl, {
+      name: tutorial.title,
+      description: tutorial.description,
+      logoUrl
+    });
+  }
+
+  return result;
+}
+
+// ─── Course metadata (PlanB tRPC API) ───────────────────────────
+
+interface CourseListItem {
+  id: string;
+  index: string;
+  name: string;
+  goal: string;
+}
+
+const coursesMetaCache = new Map<string, { data: CourseListItem[]; timestamp: number }>();
+
+async function fetchCoursesList(lang: string): Promise<CourseListItem[]> {
+  const cached = coursesMetaCache.get(lang);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data;
+  }
+
+  const input = encodeURIComponent(
+    JSON.stringify({ json: { language: lang } })
+  );
+  const url = `https://planb.network/api/trpc/content.getCourses?input=${input}`;
+
+  try {
+    const res = await fetch(url, { headers: { 'User-Agent': 'content-to-pdf' } });
+    if (!res.ok) return [];
+
+    const body = await res.json();
+    const items = body?.result?.data?.json;
+    if (!Array.isArray(items)) return [];
+
+    const courses: CourseListItem[] = items.map(
+      (c: Record<string, unknown>) => ({
+        id: (c.id as string) || '',
+        index: (c.index as string) || '',
+        name: (c.name as string) || '',
+        goal: (c.goal as string) || ''
+      })
+    );
+
+    coursesMetaCache.set(lang, { data: courses, timestamp: Date.now() });
+    return courses;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Given a list of course URLs found in markdown, fetch metadata from the
+ * PlanB tRPC API and return a Map<url, CourseMeta>.
+ */
+export async function fetchCoursesMeta(
+  urls: string[],
+  lang: string
+): Promise<Map<string, CourseMeta>> {
+  if (urls.length === 0) return new Map();
+
+  const courses = await fetchCoursesList(lang);
+  const result = new Map<string, CourseMeta>();
+
+  // Build lookup by course code (e.g. "btc101") and by UUID
+  const byKey = new Map<string, CourseListItem>();
+  for (const c of courses) {
+    byKey.set(c.index, c);
+    if (c.id) byKey.set(c.id, c);
+  }
+
+  for (const rawUrl of urls) {
+    const m = rawUrl.match(/planb\.academy\/courses\/([a-zA-Z0-9-]+)/);
+    if (!m) continue;
+
+    const urlSegment = m[1];
+    const course = byKey.get(urlSegment) || byKey.get(urlSegment.toLowerCase());
+    if (!course) continue;
+
+    const thumbnailUrl = `${RAW_BASE}/courses/${course.index}/assets/thumbnail.webp`;
+
+    result.set(rawUrl, {
+      code: course.index,
+      name: course.name,
+      goal: course.goal,
+      thumbnailUrl
+    });
+  }
+
+  return result;
 }

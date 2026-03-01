@@ -2,6 +2,7 @@
   import GeneratorForm from '$lib/components/GeneratorForm.svelte';
   import PdfPreview from '$lib/components/PdfPreview.svelte';
   import type { PageData } from './$types.js';
+  import type { PdfType } from '$lib/types.js';
 
   let { data }: { data: PageData } = $props();
 
@@ -12,13 +13,11 @@
   let savedTitle = $state('');
   let showSuccess = $state(false);
 
-
   async function handleGenerate(params: {
     code: string;
     lang: string;
-    mode: 'course' | 'quiz';
+    type: PdfType;
     count?: number;
-    answers: boolean;
     presenterName?: string;
     presenterLogo?: string;
   }) {

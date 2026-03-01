@@ -6,9 +6,11 @@ import {
   fetchCourseYml,
   fetchQuizQuestions,
   fetchLocaleFile,
-  fetchProfessorNames
+  fetchProfessorNames,
+  fetchTutorialsMeta,
+  fetchCoursesMeta
 } from '$lib/server/github.js';
-import { parseCourseMarkdown } from '$lib/markdown.js';
+import { parseCourseMarkdown, parseTeacherGuideMarkdown, extractTutorialUrls, extractCourseUrls } from '$lib/markdown.js';
 import { generateCoverHtml } from '$lib/templates/cover.js';
 import {
   generateTocHtml,
@@ -132,11 +134,115 @@ async function generateCourseHtml(
   return { html, title };
 }
 
+async function generateFullCourseHtml(
+  code: string,
+  lang: string,
+  platform: App.Platform | undefined,
+  presenterName?: string,
+  presenterLogo?: string
+): Promise<{ html: string; title: string }> {
+  const [rawMd, courseYml, locales] = await Promise.all([
+    fetchCourseMarkdown(code, lang),
+    fetchCourseYml(code),
+    loadLocales(lang)
+  ]);
+
+  const parsed = parseCourseMarkdown(rawMd, true);
+
+  // Collect all tutorial and course URLs from chapter content and fetch metadata
+  const allContent = parsed.parts.flatMap((p) => p.chapters.map((c) => c.content)).join('\n');
+  const tutorialUrls = extractTutorialUrls(allContent);
+  const courseUrls = extractCourseUrls(allContent);
+
+  const [teachers, tutorialMetaMap, courseMetaMap] = await Promise.all([
+    fetchProfessorNames((courseYml.professors_id as string[]) || [], platform),
+    fetchTutorialsMeta(tutorialUrls, lang),
+    fetchCoursesMeta(courseUrls, lang)
+  ]);
+
+  const contributorNames = (courseYml.contributor_names as string[]) || [];
+  const originalLanguage = (courseYml.original_language as string) || '';
+
+  const proofreadingEntries = (courseYml.proofreading as Array<{
+    language: string;
+    contributor_names?: string[];
+  }>) || [];
+  const langProof = proofreadingEntries.find((p) => p.language === lang);
+  const proofreaders = langProof?.contributor_names || [];
+
+  const credits: CourseCredits = {
+    teachers,
+    contributors: contributorNames,
+    proofreaders,
+    originalLanguage
+  };
+
+  const coverHtml = generateCoverHtml({
+    courseCode: code,
+    lang,
+    name: parsed.frontmatter.name,
+    goal: parsed.frontmatter.goal,
+    objectives: parsed.frontmatter.objectives,
+    level: (courseYml.level as string) || 'beginner',
+    hours: (courseYml.hours as number) || 0,
+    type: (courseYml.type as string) || 'theory',
+    topic: (courseYml.topic as string) || 'bitcoin',
+    locale: locales.locale,
+    enLocale: locales.enLocale,
+    presenterName,
+    presenterLogo
+  });
+
+  const tocHtml = generateTocHtml(parsed.parts, locales.locale, locales.enLocale);
+
+  const bodyHtml = generateCourseBodyHtml(
+    parsed.parts,
+    code,
+    lang,
+    locales.locale,
+    locales.enLocale,
+    true,
+    tutorialMetaMap,
+    courseMetaMap
+  );
+
+  const finalHtml = generateFinalPageHtml(
+    code,
+    courseYml.id as string,
+    parsed.frontmatter.name || code.toUpperCase(),
+    parsed.reviewChapterId,
+    lang,
+    credits,
+    locales.locale,
+    locales.enLocale
+  );
+
+  const title = `${parsed.frontmatter.name || code.toUpperCase()} — Full`;
+  const footerHtml = generateFooterHtml(formatCourseCode(code), escapeHtml(parsed.frontmatter.name || code.toUpperCase()), presenterLogo);
+
+  const html = `<!DOCTYPE html>
+<html lang="${lang}">
+<head>
+  <meta charset="UTF-8">
+  <title>${escapeHtml(title)}</title>
+  <style>${getSharedCss()}</style>
+</head>
+<body>
+  ${coverHtml}
+  ${tocHtml}
+  ${bodyHtml}
+  ${finalHtml}
+  ${footerHtml}
+</body>
+</html>`;
+
+  return { html, title };
+}
+
 async function generateQuizHtml(
   code: string,
   lang: string,
   count: number | undefined,
-  answers: boolean,
   platform: App.Platform | undefined,
   presenterName?: string,
   presenterLogo?: string
@@ -196,10 +302,7 @@ async function generateQuizHtml(
   const shuffled = shuffleQuestions(questions);
   const quizHtml = generateQuizBodyHtml(shuffled, code, locales.locale, locales.enLocale);
 
-  let answerKeyHtml = '';
-  if (answers) {
-    answerKeyHtml = generateAnswerKeyHtml(shuffled, locales.locale, locales.enLocale);
-  }
+  const answerKeyHtml = generateAnswerKeyHtml(shuffled, locales.locale, locales.enLocale);
 
   const title = `${courseName} - Quiz`;
   const footerHtml = generateFooterHtml(formatCourseCode(code), escapeHtml(courseName), presenterLogo);
@@ -222,23 +325,100 @@ async function generateQuizHtml(
   return { html, title };
 }
 
+async function generateTeacherGuideHtml(
+  code: string,
+  lang: string,
+  requestUrl: string,
+  presenterName?: string,
+  presenterLogo?: string
+): Promise<{ html: string; title: string }> {
+  // Fetch the teacher guide markdown from the static directory
+  const origin = new URL(requestUrl).origin;
+  const guideRes = await fetch(`${origin}/ready-to-teach/${code}-${lang}.md`);
+  if (!guideRes.ok) {
+    throw new Error(`Teacher guide not available for ${code} (${lang}).`);
+  }
+  const rawMd = await guideRes.text();
+
+  const [locales, courseYml, courseMd] = await Promise.all([
+    loadLocales(lang),
+    fetchCourseYml(code),
+    fetchCourseMarkdown(code, lang)
+  ]);
+
+  const parsed = parseTeacherGuideMarkdown(rawMd);
+  const courseParsed = parseCourseMarkdown(courseMd);
+
+  const coverHtml = generateCoverHtml({
+    courseCode: code,
+    lang,
+    name: parsed.frontmatter.name,
+    goal: courseParsed.frontmatter.goal || parsed.frontmatter.goal,
+    objectives: courseParsed.frontmatter.objectives.length > 0
+      ? courseParsed.frontmatter.objectives
+      : parsed.frontmatter.objectives,
+    level: (courseYml.level as string) || 'beginner',
+    hours: (courseYml.hours as number) || 0,
+    type: 'teacher-guide',
+    topic: (courseYml.topic as string) || 'bitcoin',
+    locale: locales.locale,
+    enLocale: locales.enLocale,
+    presenterName,
+    presenterLogo
+  });
+
+  const tocHtml = generateTocHtml(parsed.parts, locales.locale, locales.enLocale);
+
+  const bodyHtml = generateCourseBodyHtml(
+    parsed.parts,
+    code,
+    lang,
+    locales.locale,
+    locales.enLocale
+  );
+
+  const title = parsed.frontmatter.name || `${code.toUpperCase()} — Teacher Guide`;
+  const footerHtml = generateFooterHtml(formatCourseCode(code), escapeHtml(title), presenterLogo);
+
+  const html = `<!DOCTYPE html>
+<html lang="${lang}">
+<head>
+  <meta charset="UTF-8">
+  <title>${escapeHtml(title)}</title>
+  <style>${getSharedCss()}</style>
+</head>
+<body>
+  ${coverHtml}
+  ${tocHtml}
+  ${bodyHtml}
+  ${footerHtml}
+</body>
+</html>`;
+
+  return { html, title };
+}
+
 export const POST: RequestHandler = async ({ request, platform }) => {
   try {
     const body: GenerateRequest = await request.json();
-    const { code, lang, mode, count, answers, presenterName, presenterLogo } = body;
+    const { code, lang, type, count, presenterName, presenterLogo } = body;
 
-    if (!code || !lang || !mode) {
-      return json({ error: 'Missing required fields: code, lang, mode' }, { status: 400 });
+    if (!code || !lang || !type) {
+      return json({ error: 'Missing required fields: code, lang, type' }, { status: 400 });
     }
 
     let result: { html: string; title: string };
 
-    if (mode === 'course') {
+    if (type === 'course') {
       result = await generateCourseHtml(code, lang, platform, presenterName, presenterLogo);
-    } else if (mode === 'quiz') {
-      result = await generateQuizHtml(code, lang, count, answers ?? false, platform, presenterName, presenterLogo);
+    } else if (type === 'quiz') {
+      result = await generateQuizHtml(code, lang, count, platform, presenterName, presenterLogo);
+    } else if (type === 'teacher-guide') {
+      result = await generateTeacherGuideHtml(code, lang, request.url, presenterName, presenterLogo);
+    } else if (type === 'course-full') {
+      result = await generateFullCourseHtml(code, lang, platform, presenterName, presenterLogo);
     } else {
-      return json({ error: 'Invalid mode. Use "course" or "quiz".' }, { status: 400 });
+      return json({ error: 'Invalid type.' }, { status: 400 });
     }
 
     return json(result);

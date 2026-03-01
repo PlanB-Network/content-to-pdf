@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { CourseInfo } from '$lib/types.js';
+  import type { CourseInfo, PdfType } from '$lib/types.js';
 
   interface Props {
     courses: CourseInfo[];
@@ -7,9 +7,8 @@
     ongenerate: (params: {
       code: string;
       lang: string;
-      mode: 'course' | 'quiz';
+      type: PdfType;
       count?: number;
-      answers: boolean;
       presenterName?: string;
       presenterLogo?: string;
     }) => void;
@@ -47,9 +46,8 @@
   let filterTopic = $state('');
   let selectedCode = $state('');
   let selectedLang = $state('');
-  let mode = $state<'course' | 'quiz'>('course');
+  let selectedType = $state<PdfType>('course');
   let questionCount = $state('');
-  let includeAnswers = $state(false);
   let presenterName = $state('');
   let presenterLogo = $state('');
   let availableLanguages = $state<string[]>([]);
@@ -112,6 +110,42 @@
     }
   });
 
+  let teacherGuideAvailable = $derived(selectedCode === 'btc101');
+
+  // Reset type if teacher-guide is selected but course changes away from btc101
+  $effect(() => {
+    if (selectedType === 'teacher-guide' && !teacherGuideAvailable) {
+      selectedType = 'course';
+    }
+  });
+
+  let pdfTypes = $derived<{ type: PdfType; label: string; description: string; badge?: string; disabled?: boolean }[]>([
+    {
+      type: 'course',
+      label: 'Course',
+      description: 'Text and images only'
+    },
+    {
+      type: 'course-full',
+      label: 'Full Course',
+      description: 'Tutorials, videos, resources, QR codes'
+    },
+    {
+      type: 'quiz',
+      label: 'Quiz',
+      description: 'Randomized questions + answers'
+    },
+    {
+      type: 'teacher-guide',
+      label: 'Ready to Teach',
+      description: teacherGuideAvailable
+        ? 'Teacher guide with objectives and tips'
+        : 'Only available for BTC 101',
+      badge: 'BETA',
+      disabled: !teacherGuideAvailable
+    }
+  ]);
+
   function handleSubmit(e: Event) {
     e.preventDefault();
     if (!selectedCode || !selectedLang) return;
@@ -119,9 +153,8 @@
     ongenerate({
       code: selectedCode,
       lang: selectedLang,
-      mode,
+      type: selectedType,
       count: questionCount ? parseInt(questionCount) : undefined,
-      answers: includeAnswers,
       presenterName: presenterName.trim() || undefined,
       presenterLogo: presenterLogo || undefined
     });
@@ -200,35 +233,39 @@
     </select>
   </div>
 
-  <!-- Mode toggle -->
+  <!-- PDF Type card picker -->
   <div>
-    <span class="mb-2 block text-sm font-semibold text-zinc-200">Type</span>
-    <div class="flex gap-4">
-      <label class="flex cursor-pointer items-center gap-2">
-        <input
-          type="radio"
-          name="mode"
-          value="course"
-          bind:group={mode}
-          class="accent-planb-orange"
-        />
-        <span class="text-sm text-zinc-300">Course PDF</span>
-      </label>
-      <label class="flex cursor-pointer items-center gap-2">
-        <input
-          type="radio"
-          name="mode"
-          value="quiz"
-          bind:group={mode}
-          class="accent-planb-orange"
-        />
-        <span class="text-sm text-zinc-300">Quiz PDF</span>
-      </label>
+    <span class="mb-2 block text-sm font-semibold text-zinc-200">What do you want to generate?</span>
+    <div class="grid grid-cols-2 gap-2">
+      {#each pdfTypes as card}
+        <button
+          type="button"
+          disabled={card.disabled}
+          onclick={() => { if (!card.disabled) selectedType = card.type; }}
+          class="relative flex flex-col items-start rounded-lg border px-3 py-2.5 text-left transition-all {
+            selectedType === card.type && !card.disabled
+              ? 'border-planb-orange bg-planb-orange/10 ring-1 ring-planb-orange'
+              : card.disabled
+                ? 'cursor-not-allowed border-zinc-800 bg-zinc-900/50 opacity-50'
+                : 'border-zinc-700 bg-zinc-800/60 hover:border-zinc-500'
+          }"
+        >
+          {#if card.badge}
+            <span class="absolute right-2 top-2 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider {
+              card.badge === 'BETA'
+                ? 'bg-planb-orange/20 text-planb-orange'
+                : 'bg-zinc-700/50 text-zinc-500'
+            }">{card.badge}</span>
+          {/if}
+          <span class="text-sm font-semibold text-zinc-200">{card.label}</span>
+          <span class="mt-0.5 text-xs text-zinc-400">{card.description}</span>
+        </button>
+      {/each}
     </div>
   </div>
 
   <!-- Quiz options -->
-  {#if mode === 'quiz'}
+  {#if selectedType === 'quiz'}
     <div class="space-y-3 border-l-2 border-planb-orange/30 pl-4">
       <div>
         <label for="count" class="mb-1 block text-sm text-zinc-400">
@@ -243,14 +280,10 @@
           class="w-40 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:border-planb-orange focus:outline-none focus:ring-1 focus:ring-planb-orange"
         />
       </div>
-      <label class="flex cursor-pointer items-center gap-2">
-        <input
-          type="checkbox"
-          bind:checked={includeAnswers}
-          class="rounded border-zinc-600 bg-zinc-800 text-planb-orange accent-planb-orange focus:ring-planb-orange"
-        />
-        <span class="text-sm text-zinc-400">Include answers</span>
-      </label>
+      <p class="text-xs text-zinc-500">
+        Quizzes are randomized. Answers are always included at the end of the PDF.
+        Print only the question pages to hand out to students.
+      </p>
     </div>
   {/if}
 

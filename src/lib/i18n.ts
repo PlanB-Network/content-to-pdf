@@ -25,7 +25,7 @@ const DEFAULTS: Record<string, string> = {
   'courses.exam.explanations': 'Explanations',
   'courses.final.endOfCourse': 'End of',
   'courses.final.thankYouCompleting': 'Thank you for completing this course.',
-  'courses.final.leaveReview': 'If you enjoyed this course, please leave a review on the platform.',
+  'courses.final.leaveReview': 'Your feedback means a lot! Drop us a comment online for the next student to start learning.',
   'courses.final.credits': 'Credits',
   'courses.final.teacher': 'Teacher',
   'courses.final.contributors': 'Contributors',

@@ -315,6 +315,200 @@ export function getSharedCss(): string {
     th { font-weight: 700; background: #f2f2f2; }
     tr:nth-child(even) { background: #fafafa; }
 
+    /* ============ Resource cards (full course mode) ============ */
+    .resource-card {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      border: 1.5px solid #e5e5e5;
+      border-left: 4px solid ${ORANGE};
+      border-radius: 6px;
+      padding: 12px 16px;
+      margin: 14px 0;
+      page-break-inside: avoid;
+      break-inside: avoid;
+      background: #fefefe;
+    }
+    .resource-card-body {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+    }
+    .resource-card-thumb {
+      width: 100px;
+      height: 56px;
+      max-width: 100px;
+      max-height: 56px;
+      object-fit: cover;
+      border-radius: 4px;
+      flex-shrink: 0;
+      margin: 0;
+    }
+    .resource-card-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .resource-card-type {
+      font-size: 7pt;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: ${ORANGE};
+      margin-bottom: 2px;
+    }
+    .resource-card-title {
+      font-size: 10pt;
+      font-weight: 600;
+      color: #1a1a1a;
+      line-height: 1.3;
+    }
+    .resource-card-desc {
+      font-size: 7.5pt;
+      color: #666;
+      line-height: 1.35;
+      margin-top: 2px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .resource-card-qr {
+      flex-shrink: 0;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+    }
+    .resource-card-qr img {
+      width: 70px;
+      height: 70px;
+      max-width: 70px;
+      margin: 0;
+    }
+    .resource-card-qr a img {
+      display: block;
+    }
+    .resource-card-url {
+      font-size: 7pt;
+      color: ${ORANGE};
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    /* ============ Tutorial cards (enriched) ============ */
+    .tutorial-card {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      border: 1.5px solid #e5e5e5;
+      border-left: 4px solid ${ORANGE};
+      border-radius: 6px;
+      padding: 12px 16px;
+      margin: 14px 0;
+      page-break-inside: avoid;
+      break-inside: avoid;
+      background: #fefefe;
+    }
+    .tutorial-card-body {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+    }
+    .tutorial-card-logo {
+      width: 48px;
+      height: 48px;
+      max-width: 48px;
+      max-height: 48px;
+      object-fit: contain;
+      border-radius: 6px;
+      flex-shrink: 0;
+      margin: 0;
+      background: #f5f5f5;
+    }
+    .tutorial-card-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .tutorial-card-type {
+      font-size: 7pt;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: ${ORANGE};
+      margin-bottom: 1px;
+    }
+    .tutorial-card-title {
+      font-size: 10pt;
+      font-weight: 600;
+      color: #1a1a1a;
+      margin-bottom: 2px;
+      line-height: 1.3;
+    }
+    .tutorial-card-desc {
+      font-size: 7.5pt;
+      color: #666;
+      line-height: 1.35;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .tutorial-card-right {
+      flex-shrink: 0;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+    .tutorial-card-right img {
+      width: 60px;
+      height: 60px;
+      max-width: 60px;
+      margin: 0;
+    }
+    .tutorial-card-right a img {
+      display: block;
+    }
+    .tutorial-card-url {
+      font-size: 7pt;
+      color: ${ORANGE};
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    /* ============ Task list checkboxes ============ */
+    li.task-list-item {
+      list-style: none;
+      margin-left: -1.2em;
+    }
+    li.task-list-item input[type="checkbox"] {
+      margin-right: 6px;
+      transform: scale(1.15);
+      vertical-align: middle;
+    }
+
+    /* ============ Teacher notes (Ready to Teach) ============ */
+    .teacher-notes {
+      border: 1.5px solid #d4d4d4;
+      border-radius: 6px;
+      min-height: 360px;
+      padding: 10px 14px;
+      margin: 6px 0 14px 0;
+      background:
+        repeating-linear-gradient(
+          to bottom,
+          transparent,
+          transparent 23px,
+          #e8e8e8 23px,
+          #e8e8e8 24px
+        );
+      background-position: 0 10px;
+    }
+
     /* ============ Quiz styling ============ */
     .quiz-header-box {
       background: ${ORANGE};
