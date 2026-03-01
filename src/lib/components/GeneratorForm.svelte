@@ -128,7 +128,7 @@
     {
       type: 'course-full',
       label: 'Full Course',
-      description: 'Tutorials, videos, resources, QR codes'
+      description: 'Tutorials, resources, QR codes'
     },
     {
       type: 'quiz',
